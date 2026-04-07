@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS Subject (
     subject_id   VARCHAR(20)  NOT NULL,
     subject_name VARCHAR(100) NOT NULL,
     credits      INT          NOT NULL,
+    semester     INT          NOT NULL DEFAULT 1,
     PRIMARY KEY (subject_id)
 ) ENGINE=InnoDB;
 
@@ -39,12 +40,13 @@ CREATE TABLE IF NOT EXISTS Subject (
 -- total_marks = cie_marks + ese_marks (out of 100)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS Marks (
-    roll_no      INT         NOT NULL,
-    subject_id   VARCHAR(20) NOT NULL,
-    semester     INT         NOT NULL,
-    cie_marks    INT         NOT NULL DEFAULT 0,
-    ese_marks    INT         NOT NULL DEFAULT 0,
-    total_marks  INT         GENERATED ALWAYS AS (cie_marks + ese_marks) STORED,
+    roll_no        INT         NOT NULL,
+    subject_id     VARCHAR(20) NOT NULL,
+    semester       INT         NOT NULL,
+    cie_marks      INT         NOT NULL DEFAULT 0,
+    ese_marks      INT         NOT NULL DEFAULT 0,
+    credits_earned INT         NOT NULL DEFAULT 0,
+    total_marks    INT         GENERATED ALWAYS AS (cie_marks + ese_marks) STORED,
     PRIMARY KEY (roll_no, subject_id, semester),
     CONSTRAINT fk_marks_student  FOREIGN KEY (roll_no)     REFERENCES Student(roll_no)    ON DELETE CASCADE,
     CONSTRAINT fk_marks_subject  FOREIGN KEY (subject_id)  REFERENCES Subject(subject_id) ON DELETE CASCADE,

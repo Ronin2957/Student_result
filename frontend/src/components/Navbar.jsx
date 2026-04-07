@@ -8,8 +8,8 @@ const Navbar = () => {
   return (
     <nav className="navbar">
       <a className="navbar-brand" href="#">
-        <div className="navbar-logo">P</div>
-        <span className="navbar-name">Paradigm</span>
+        <div className="navbar-logo">G</div>
+        <span className="navbar-name">GradeMatrix</span>
       </a>
 
       <div className="navbar-links">

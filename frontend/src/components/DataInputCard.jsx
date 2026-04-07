@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import DataTable from './DataTable'
 
 const API = 'http://localhost:5000/api'
@@ -17,6 +17,7 @@ const subjectCols = [
   { key: 'subject_id',   label: 'Subject ID' },
   { key: 'subject_name', label: 'Subject Name' },
   { key: 'credits',      label: 'Credits' },
+  { key: 'semester',     label: 'Semester' },
 ]
 
 const marksCols = [
@@ -28,7 +29,9 @@ const marksCols = [
   { key: 'cie_marks',    label: 'CIE (40)' },
   { key: 'ese_marks',    label: 'ESE (60)' },
   { key: 'total_marks',  label: 'Total (100)',
-    render: (val) => <strong style={{ color: 'var(--purple-400)' }}>{val}</strong> },
+    render: (val) => <strong style={{ color: 'var(--purple-500)' }}>{val}</strong> },
+  { key: 'credits_earned', label: 'Credits',
+    render: (val) => <strong style={{ color: 'var(--cyan-500)' }}>{val}</strong> },
   { key: '_status', label: 'Status',
     render: (_, row) => {
       const ok = row.cie_marks >= 18 && row.ese_marks >= 24
@@ -41,7 +44,7 @@ const resultCols = [
   { key: 'student_name',       label: 'Student' },
   { key: 'semester',           label: 'Sem' },
   { key: 'sgpa',               label: 'SGPA',
-    render: (val) => val != null ? <strong style={{ color: 'var(--cyan-400)' }}>{Number(val).toFixed(2)}</strong> : '—' },
+    render: (val) => val != null ? <strong style={{ color: 'var(--purple-500)' }}>{Number(val).toFixed(2)}</strong> : '—' },
   { key: 'total_credits',      label: 'Credits' },
   { key: 'grace_used',         label: 'Grace' },
   { key: 'number_of_backlogs', label: 'Backlogs' },
@@ -75,15 +78,32 @@ const DataInputCard = () => {
   const [marks,    setMarks]    = useState([])
   const [results,  setResults]  = useState([])
 
+  /* filtered subjects for marks form */
+  const [semesterSubjects, setSemesterSubjects] = useState([])
+
   /* form states */
   const [studentForm, setStudentForm] = useState({ roll_no:'', name:'', seat_no:'', category:'General', year:'', semester:'' })
-  const [subjectForm, setSubjectForm] = useState({ subject_id:'', subject_name:'', credits:'' })
-  const [marksForm,   setMarksForm]   = useState({ roll_no:'', subject_id:'', semester:'', cie_marks:'', ese_marks:'' })
+  const [subjectForm, setSubjectForm] = useState({ subject_id:'', subject_name:'', credits:'', semester:'' })
+  const [marksForm,   setMarksForm]   = useState({ roll_no:'', subject_id:'', semester:'', cie_marks:'', ese_marks:'', credits_earned:'' })
 
-  const showAlert = (msg, type = 'success') => {
+  const showAlertMsg = (msg, type = 'success') => {
     setAlert({ msg, type })
     setTimeout(() => setAlert({ msg: '', type: 'success' }), 4000)
   }
+
+  /* Fetch subjects when marks form semester changes */
+  useEffect(() => {
+    if (marksForm.semester) {
+      fetch(`${API}/subjects?semester=${marksForm.semester}`)
+        .then(r => r.json())
+        .then(data => setSemesterSubjects(Array.isArray(data) ? data : []))
+        .catch(() => setSemesterSubjects([]))
+    } else {
+      setSemesterSubjects([])
+    }
+    // Reset subject selection when semester changes
+    setMarksForm(prev => ({ ...prev, subject_id: '' }))
+  }, [marksForm.semester])
 
   /* ── Fetch all tables ── */
   const fetchAll = async () => {
@@ -101,7 +121,7 @@ const DataInputCard = () => {
       setResults(Array.isArray(r)    ? r   : [])
       setShowData(true)
     } catch {
-      showAlert('Failed to fetch data. Is the backend running?', 'error')
+      showAlertMsg('Failed to fetch data. Is the backend running?', 'error')
     } finally {
       setDataLoading(false)
     }
@@ -118,10 +138,10 @@ const DataInputCard = () => {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      showAlert('Student added & Prolog KB updated! ✨')
+      showAlertMsg('Student added & Prolog KB updated! ✨')
       setStudentForm({ roll_no:'', name:'', seat_no:'', category:'General', year:'', semester:'' })
     } catch (err) {
-      showAlert(err.message, 'error')
+      showAlertMsg(err.message, 'error')
     } finally {
       setLoading(false)
     }
@@ -137,10 +157,10 @@ const DataInputCard = () => {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      showAlert('Subject added & Prolog KB updated! ✨')
-      setSubjectForm({ subject_id:'', subject_name:'', credits:'' })
+      showAlertMsg('Subject added & Prolog KB updated! ✨')
+      setSubjectForm({ subject_id:'', subject_name:'', credits:'', semester:'' })
     } catch (err) {
-      showAlert(err.message, 'error')
+      showAlertMsg(err.message, 'error')
     } finally {
       setLoading(false)
     }
@@ -156,10 +176,10 @@ const DataInputCard = () => {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      showAlert('Marks added & Prolog KB updated! ✨')
-      setMarksForm({ roll_no:'', subject_id:'', semester:'', cie_marks:'', ese_marks:'' })
+      showAlertMsg('Marks added & Prolog KB updated! ✨')
+      setMarksForm(prev => ({ ...prev, subject_id:'', cie_marks:'', ese_marks:'' }))
     } catch (err) {
-      showAlert(err.message, 'error')
+      showAlertMsg(err.message, 'error')
     } finally {
       setLoading(false)
     }
@@ -260,6 +280,13 @@ const DataInputCard = () => {
               <input id="sub-credits" type="number" min="1" max="6" placeholder="e.g. 4" required value={ssf.credits}
                 onChange={e => setSubjectForm({...ssf, credits: e.target.value})} />
             </div>
+            <div className="form-group">
+              <label htmlFor="sub-sem">Semester</label>
+              <select id="sub-sem" value={ssf.semester} onChange={e => setSubjectForm({...ssf, semester: e.target.value})} required>
+                <option value="">Select Semester</option>
+                {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+              </select>
+            </div>
           </div>
           <div className="actions-row">
             <button id="submit-subject" type="submit" className="btn btn-primary" disabled={loading}>
@@ -279,15 +306,21 @@ const DataInputCard = () => {
                 onChange={e => setMarksForm({...mf, roll_no: e.target.value})} />
             </div>
             <div className="form-group">
-              <label htmlFor="m-subid">Subject ID</label>
-              <input id="m-subid" type="text" placeholder="e.g. CS301" required value={mf.subject_id}
-                onChange={e => setMarksForm({...mf, subject_id: e.target.value})} />
-            </div>
-            <div className="form-group">
               <label htmlFor="m-sem">Semester</label>
               <select id="m-sem" value={mf.semester} onChange={e => setMarksForm({...mf, semester: e.target.value})} required>
                 <option value="">Select Semester</option>
                 {[1,2,3,4,5,6,7,8].map(s => <option key={s} value={s}>Semester {s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label htmlFor="m-subid">Subject {mf.semester ? `(Sem ${mf.semester})` : ''}</label>
+              <select id="m-subid" value={mf.subject_id} onChange={e => setMarksForm({...mf, subject_id: e.target.value})} required disabled={!mf.semester}>
+                <option value="">{mf.semester ? (semesterSubjects.length > 0 ? '— Select subject —' : 'No subjects for this semester') : '— Select semester first —'}</option>
+                {semesterSubjects.map(s => (
+                  <option key={s.subject_id} value={s.subject_id}>
+                    [{s.subject_id}] {s.subject_name} ({s.credits} cr)
+                  </option>
+                ))}
               </select>
             </div>
             <div className="form-group">
@@ -300,9 +333,14 @@ const DataInputCard = () => {
               <input id="m-ese" type="number" min="0" max="60" placeholder="0 – 60" required value={mf.ese_marks}
                 onChange={e => setMarksForm({...mf, ese_marks: e.target.value})} />
             </div>
+            <div className="form-group">
+              <label htmlFor="m-credits">Credits Earned</label>
+              <input id="m-credits" type="number" min="0" max="6" placeholder="e.g. 3" required value={mf.credits_earned}
+                onChange={e => setMarksForm({...mf, credits_earned: e.target.value})} />
+            </div>
             <div className="form-group" style={{ justifyContent: 'flex-end' }}>
               <label>Live Total</label>
-              <div style={{ padding: '10px 14px', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.25)', borderRadius: 'var(--radius-sm)', fontWeight: 700, color: 'var(--purple-400)', fontSize: '1rem' }}>
+              <div style={{ padding: '9px 12px', background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 'var(--radius-sm)', fontWeight: 700, color: 'var(--purple-500)', fontSize: '1rem' }}>
                 {(parseInt(mf.cie_marks)||0) + (parseInt(mf.ese_marks)||0)} / 100
               </div>
             </div>
@@ -316,7 +354,7 @@ const DataInputCard = () => {
       )}
 
       {/* ─── Show Data Button ─── */}
-      <div style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
+      <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
         <button id="show-data-btn" className="btn btn-secondary" onClick={fetchAll} disabled={dataLoading}>
           {dataLoading ? <><span className="spinner"></span>Loading...</> : showData ? '🔄 Refresh Data' : '👁 Show Data'}
         </button>

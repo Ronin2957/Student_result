@@ -52,11 +52,11 @@ def get_students():
 @app.route("/api/subject", methods=["POST"])
 def add_subject():
     data = request.get_json()
-    required = ["subject_id", "subject_name", "credits"]
+    required = ["subject_id", "subject_name", "credits", "semester"]
     if not all(k in data for k in required):
         return jsonify({"error": f"Missing fields. Required: {required}"}), 400
     try:
-        db.insert_subject(data["subject_id"], data["subject_name"], int(data["credits"]))
+        db.insert_subject(data["subject_id"], data["subject_name"], int(data["credits"]), int(data["semester"]))
         prolog_bridge.regenerate_kb()
         return jsonify({"message": "Subject added and Prolog KB updated."}), 201
     except Exception as e:
@@ -66,6 +66,9 @@ def add_subject():
 @app.route("/api/subjects", methods=["GET"])
 def get_subjects():
     try:
+        semester = request.args.get("semester")
+        if semester:
+            return jsonify(db.get_subjects_by_semester(int(semester)))
         return jsonify(db.get_all_subjects())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -77,12 +80,13 @@ def get_subjects():
 @app.route("/api/marks", methods=["POST"])
 def add_marks():
     data = request.get_json()
-    required = ["roll_no", "subject_id", "semester", "cie_marks", "ese_marks"]
+    required = ["roll_no", "subject_id", "semester", "cie_marks", "ese_marks", "credits_earned"]
     if not all(k in data for k in required):
         return jsonify({"error": f"Missing fields. Required: {required}"}), 400
 
     cie = int(data["cie_marks"])
     ese = int(data["ese_marks"])
+    credits_earned = int(data["credits_earned"])
     if not (0 <= cie <= 40):
         return jsonify({"error": "CIE marks must be between 0 and 40"}), 400
     if not (0 <= ese <= 60):
@@ -91,7 +95,7 @@ def add_marks():
     try:
         db.insert_marks(
             int(data["roll_no"]), data["subject_id"],
-            int(data["semester"]), cie, ese
+            int(data["semester"]), cie, ese, credits_earned
         )
         prolog_bridge.regenerate_kb()
         return jsonify({"message": "Marks added and Prolog KB updated."}), 201
@@ -135,7 +139,7 @@ def regenerate_prolog():
 def prolog_query():
     """
     Run a Prolog query for a student+semester.
-    Body: { "query_type": "sgpa"|"total_credits"|"grace_used"|"result_status"|"number_of_backlogs",
+    Body: { "query_type": "sgpa"|"total_credits"|"grace_used"|"result_status"|"number_of_backlogs"|"cgpa",
             "roll_no": 101, "semester": 3 }
     """
     data = request.get_json()
@@ -150,7 +154,6 @@ def prolog_query():
     result = prolog_bridge.run_prolog_query(query_type, roll_no, semester)
 
     if result["success"]:
-        # Persist result to DB by running all 5 queries together then upserting
         _maybe_persist_result(roll_no, semester, query_type, result["value"])
 
     return jsonify({
@@ -183,7 +186,40 @@ def _maybe_persist_result(roll_no: int, semester: int, just_queried: str, value)
                 results.get("number_of_backlogs", 0),
             )
     except Exception:
-        pass  # Non-critical — result display still works from in-memory query
+        pass
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# ANALYSIS / CGPA / HISTORY endpoints
+# ════════════════════════════════════════════════════════════════════════════
+@app.route("/api/student/<int:roll_no>/analysis", methods=["GET"])
+def student_analysis(roll_no):
+    """Return per-subject analysis with pass/fail reasoning."""
+    semester = request.args.get("semester")
+    if not semester:
+        return jsonify({"error": "Query parameter 'semester' is required."}), 400
+    try:
+        return jsonify(db.get_subject_analysis(roll_no, int(semester)))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/<int:roll_no>/cgpa", methods=["GET"])
+def student_cgpa(roll_no):
+    """Return computed CGPA for a student (from persisted Result rows)."""
+    try:
+        return jsonify(db.get_cgpa(roll_no))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/<int:roll_no>/history", methods=["GET"])
+def student_history(roll_no):
+    """Return semester-wise SGPA / credits / grace history."""
+    try:
+        return jsonify(db.get_semester_history(roll_no))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

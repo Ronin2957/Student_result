@@ -9,17 +9,6 @@ function App() {
       <Navbar />
 
       <main className="main-container">
-        {/* ── Hero ── */}
-        <div className="hero">
-          <div className="hero-badge">⚛️ Prolog × MySQL × React × Python</div>
-          <h1>Student Result Management<br />with AI Inference</h1>
-          <p>
-            Enter raw student and marks data once — the system automatically
-            builds a Prolog knowledge base and computes SGPA, credits, grace,
-            backlogs & result status through intelligent inference.
-          </p>
-        </div>
-
         {/* ── Cards ── */}
         <DataInputCard />
         <PrologCard />

@@ -46,7 +46,7 @@ def generate_facts() -> str:
     for m in marks:
         lines.append(
             f"marks({m['roll_no']}, '{m['subject_id']}', {m['semester']}, "
-            f"{m['cie_marks']}, {m['ese_marks']}, {m['total_marks']})."
+            f"{m['cie_marks']}, {m['ese_marks']}, {m['total_marks']}, {m['credits_earned']})."
         )
 
     return "\n".join(lines)
@@ -113,6 +113,14 @@ QUERY_TEMPLATES = {
     "number_of_backlogs": (
         "number_of_backlogs({roll_no}, {semester}, X), "
         "format('RESULT:~w', [X]), nl, halt."
+    ),
+    "cgpa": (
+        "cgpa({roll_no}, X), "
+        "format('RESULT:~4f', [X]), nl, halt."
+    ),
+    "next_year_eligible": (
+        "next_year_eligible({roll_no}, Backlogs, Credits, MinCredits, Eligible), "
+        "format('RESULT:~w|~w|~w|~w', [Eligible, Backlogs, Credits, MinCredits]), nl, halt."
     ),
 }
 

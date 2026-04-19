@@ -144,6 +144,7 @@ async function submitStudent(e) {
     if (!res.ok) throw new Error(data.error);
     showDataAlert('Student added & Prolog KB updated! ✨', 'success');
     e.target.reset();
+    loadPrologStudents(); // Refresh the Prolog student dropdown
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
 
@@ -211,6 +212,7 @@ async function fetchAllData() {
     renderResultsTable(Array.isArray(results) ? results : []);
     document.getElementById('data-tables').classList.remove('hidden');
     btn.textContent = '🔄 Refresh Data';
+    loadPrologStudents(); // Refresh Prolog dropdown too
   } catch {
     showDataAlert('Failed to fetch data. Is the backend running?', 'error');
     btn.textContent = '👁 Show Data';
@@ -296,6 +298,7 @@ async function deleteStudent(rollNo) {
     if (!res.ok) throw new Error(data.error);
     showDataAlert(data.message, 'success');
     fetchAllData();
+    loadPrologStudents(); // Refresh Prolog dropdown
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
 
@@ -390,6 +393,7 @@ function editStudent(s) {
       showDataAlert(data.message, 'success');
       closeEditModal();
       fetchAllData();
+      loadPrologStudents(); // Refresh Prolog dropdown
     } catch (err) { showDataAlert(err.message, 'error'); }
   });
 }
@@ -470,14 +474,30 @@ buildQueryButtons();
 async function loadPrologStudents() {
   try {
     const res = await fetch(API + '/students');
-    prologStudents = await res.json();
-    if (!Array.isArray(prologStudents)) prologStudents = [];
+    if (!res.ok) throw new Error('API returned ' + res.status);
+    const data = await res.json();
+    prologStudents = Array.isArray(data) ? data : [];
     const sel = document.getElementById('p-student');
+    const prevVal = sel.value; // Preserve current selection
     sel.innerHTML = '<option value="">— Choose a student —</option>';
     prologStudents.forEach(s => {
-      sel.innerHTML += '<option value="' + s.roll_no + '">[' + s.roll_no + '] ' + s.name + '</option>';
+      const opt = document.createElement('option');
+      opt.value = s.roll_no;
+      opt.textContent = '[' + s.roll_no + '] ' + s.name;
+      sel.appendChild(opt);
     });
-  } catch {}
+    // Restore previous selection if it still exists
+    if (prevVal && prologStudents.some(s => String(s.roll_no) === String(prevVal))) {
+      sel.value = prevVal;
+    }
+  } catch (err) {
+    console.warn('loadPrologStudents failed:', err.message);
+    // Retry after 3 seconds if this was the initial load
+    if (!loadPrologStudents._retried) {
+      loadPrologStudents._retried = true;
+      setTimeout(loadPrologStudents, 3000);
+    }
+  }
 }
 loadPrologStudents();
 

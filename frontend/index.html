@@ -1,14 +1,295 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="GradeMatrix — Student result management using Prolog inference, MySQL, Python and React." />
-    <meta name="keywords" content="student result, prolog, SGPA, university result, gradematrix" />
-    <title>GradeMatrix — Student Result System</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GradeMatrix — Student Result Analysis System</title>
+  <meta name="description" content="Student Result Analysis System with Prolog inference engine">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══ NAVBAR ═══ -->
+<nav class="navbar">
+  <a class="navbar-brand" href="#">
+    <div class="navbar-logo">G</div>
+    <span class="navbar-name">GradeMatrix</span>
+  </a>
+  <div class="navbar-links">
+    <button class="navbar-link" onclick="document.getElementById('data-input-section').scrollIntoView({behavior:'smooth'})">📋 Data Input</button>
+    <button class="navbar-link" onclick="document.getElementById('prolog-section').scrollIntoView({behavior:'smooth'})">🧠 Prolog</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle Dark / Light Mode">
+      <span class="theme-icon" id="theme-icon">🌙</span>
+    </button>
+  </div>
+</nav>
+
+<!-- ═══ MAIN ═══ -->
+<main class="main-container">
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- DATA INPUT CARD -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div id="data-input-section" class="card">
+    <div class="card-header">
+      <div class="card-icon purple">📋</div>
+      <div>
+        <div class="card-title">Data Input</div>
+        <div class="card-subtitle">Add students, subjects &amp; marks to the database</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-student" onclick="switchTab('student')">👤 Student</button>
+      <button class="tab-btn" id="tab-subject" onclick="switchTab('subject')">📚 Subject</button>
+      <button class="tab-btn" id="tab-marks" onclick="switchTab('marks')">📝 Marks</button>
+    </div>
+
+    <!-- Alert -->
+    <div id="data-alert" class="hidden"></div>
+
+    <!-- Student Form -->
+    <form id="form-student" onsubmit="submitStudent(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="s-roll">Roll Number</label>
+          <input id="s-roll" type="number" placeholder="e.g. 101" required>
+        </div>
+        <div class="form-group">
+          <label for="s-name">Full Name</label>
+          <input id="s-name" type="text" placeholder="e.g. Riya Sharma" required>
+        </div>
+        <div class="form-group">
+          <label for="s-seat">Seat Number</label>
+          <input id="s-seat" type="text" placeholder="e.g. A-24" required>
+        </div>
+        <div class="form-group">
+          <label for="s-cat">Category</label>
+          <select id="s-cat">
+            <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="s-year">Year</label>
+          <select id="s-year" required>
+            <option value="">Select Year</option>
+            <option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="s-sem">Semester</label>
+          <select id="s-sem" required>
+            <option value="">Select Semester</option>
+            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
+            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+          </select>
+        </div>
+      </div>
+      <div><button type="submit" class="btn btn-primary" id="submit-student">➕ Add Student</button></div>
+    </form>
+
+    <!-- Subject Form -->
+    <form id="form-subject" class="hidden" onsubmit="submitSubject(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="sub-id">Subject ID</label>
+          <input id="sub-id" type="text" placeholder="e.g. CS301" required>
+        </div>
+        <div class="form-group">
+          <label for="sub-name">Subject Name</label>
+          <input id="sub-name" type="text" placeholder="e.g. Data Structures" required>
+        </div>
+        <div class="form-group">
+          <label for="sub-credits">Credits</label>
+          <input id="sub-credits" type="number" min="1" max="6" placeholder="e.g. 4" required>
+        </div>
+        <div class="form-group">
+          <label for="sub-sem">Semester</label>
+          <select id="sub-sem" required>
+            <option value="">Select Semester</option>
+            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
+            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+          </select>
+        </div>
+      </div>
+      <div><button type="submit" class="btn btn-primary" id="submit-subject">➕ Add Subject</button></div>
+    </form>
+
+    <!-- Marks Form -->
+    <form id="form-marks" class="hidden" onsubmit="submitMarks(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="m-roll">Roll Number</label>
+          <input id="m-roll" type="number" placeholder="e.g. 101" required>
+        </div>
+        <div class="form-group">
+          <label for="m-sem">Semester</label>
+          <select id="m-sem" required onchange="loadSemesterSubjects()">
+            <option value="">Select Semester</option>
+            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
+            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="m-subid">Subject</label>
+          <select id="m-subid" required disabled>
+            <option value="">— Select semester first —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="m-cie">CIE Marks (max 40)</label>
+          <input id="m-cie" type="number" min="0" max="40" placeholder="0 – 40" required oninput="updateLiveTotal()">
+        </div>
+        <div class="form-group">
+          <label for="m-ese">ESE Marks (max 60)</label>
+          <input id="m-ese" type="number" min="0" max="60" placeholder="0 – 60" required oninput="updateLiveTotal()">
+        </div>
+        <div class="form-group">
+          <label for="m-credits">Credits Earned</label>
+          <input id="m-credits" type="number" min="0" max="6" placeholder="e.g. 3" required>
+        </div>
+        <div class="form-group">
+          <label>Live Total</label>
+          <div id="live-total" style="padding:8px 10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:6px;font-weight:700;color:var(--text-accent, #6366f1);font-size:0.9rem;">0 / 100</div>
+        </div>
+      </div>
+      <div><button type="submit" class="btn btn-primary" id="submit-marks">➕ Add Marks</button></div>
+    </form>
+
+    <!-- Show Data -->
+    <div style="margin-top:1.5rem;border-top:1px solid var(--border-main, #dde1e8);padding-top:1rem;">
+      <button class="btn btn-secondary" id="show-data-btn" onclick="fetchAllData()">👁 Show Data</button>
+    </div>
+
+    <!-- Data Tables -->
+    <div id="data-tables" class="hidden">
+      <!-- Students Table -->
+      <div class="table-section">
+        <div class="table-section-header">
+          <div class="table-section-title"><span class="table-dot purple"></span> Students</div>
+          <span id="students-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
+        </div>
+        <div class="table-wrapper"><table><thead><tr>
+          <th>Roll No</th><th>Name</th><th>Seat No</th><th>Category</th><th>Year</th><th>Semester</th><th>Actions</th>
+        </tr></thead><tbody id="students-tbody"><tr><td colspan="7" class="empty-table">No students added yet.</td></tr></tbody></table></div>
+      </div>
+
+      <!-- Subjects Table -->
+      <div class="table-section">
+        <div class="table-section-header">
+          <div class="table-section-title"><span class="table-dot cyan"></span> Subjects</div>
+          <span id="subjects-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
+        </div>
+        <div class="table-wrapper"><table><thead><tr>
+          <th>Subject ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th><th>Actions</th>
+        </tr></thead><tbody id="subjects-tbody"><tr><td colspan="5" class="empty-table">No subjects added yet.</td></tr></tbody></table></div>
+      </div>
+
+      <!-- Marks Table -->
+      <div class="table-section">
+        <div class="table-section-header">
+          <div class="table-section-title"><span class="table-dot green"></span> Marks</div>
+          <span id="marks-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
+        </div>
+        <div class="table-wrapper"><table><thead><tr>
+          <th>Roll</th><th>Student</th><th>Subject ID</th><th>Subject</th><th>Sem</th><th>CIE(40)</th><th>ESE(60)</th><th>Total(100)</th><th>Credits</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody id="marks-tbody"><tr><td colspan="11" class="empty-table">No marks added yet.</td></tr></tbody></table></div>
+      </div>
+
+      <!-- Results Table -->
+      <div class="table-section" id="results-section">
+        <div class="table-section-header">
+          <div class="table-section-title"><span class="table-dot amber"></span> Results (via Prolog)</div>
+          <span id="results-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
+        </div>
+        <div class="table-wrapper"><table><thead><tr>
+          <th>Roll</th><th>Student</th><th>Sem</th><th>SGPA</th><th>Credits</th><th>Grace</th><th>Backlogs</th><th>Status</th>
+        </tr></thead><tbody id="results-tbody"><tr><td colspan="8" class="empty-table">No results computed yet.</td></tr></tbody></table></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ -->
+  <!-- PROLOG INFERENCE ENGINE CARD -->
+  <!-- ════════════════════════════════════════════════════ -->
+  <div id="prolog-section" class="card">
+    <div class="card-header">
+      <div class="card-icon cyan">🧠</div>
+      <div>
+        <div class="card-title">Prolog Inference Engine</div>
+        <div class="card-subtitle">Run knowledge-base queries on student data</div>
+      </div>
+    </div>
+
+    <!-- Student + Semester selector -->
+    <div class="selector-row">
+      <div class="form-group">
+        <label for="p-student">Select Student</label>
+        <select id="p-student" onchange="onPrologStudentChange()">
+          <option value="">— Choose a student —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="p-sem">Select Semester</label>
+        <select id="p-sem" onchange="onPrologSemChange()">
+          <option value="">— Choose semester —</option>
+          <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
+          <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Student info chip -->
+    <div id="prolog-student-info" class="student-info-chip hidden"></div>
+
+    <!-- Error -->
+    <div id="prolog-error" class="alert alert-error hidden"></div>
+
+    <div class="selector-divider"></div>
+
+    <div style="margin-bottom:0.5rem;">
+      <div class="section-label">Prolog Queries — Click to Run</div>
+    </div>
+
+    <!-- Query Buttons -->
+    <div class="query-grid" id="query-grid"></div>
+
+    <!-- Results Panel -->
+    <div id="prolog-results" class="hidden" style="margin-top:1.5rem;">
+      <div class="section-label" style="margin-bottom:0.75rem;" id="prolog-results-title">Query Results</div>
+      <div class="results-list" id="prolog-results-list"></div>
+      <div style="margin-top:0.75rem;font-size:0.75rem;color:#94a3b8;">
+        Results stored in database. Refresh "Show Data" in the Data Input card to see updated Result table.
+      </div>
+    </div>
+
+    <!-- Empty states -->
+    <div id="prolog-empty-selection" style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:0.85rem;">
+      <div style="font-size:2rem;margin-bottom:0.5rem;">☝️</div>
+      Select a student and semester to enable Prolog queries.
+    </div>
+    <div id="prolog-empty-results" class="hidden" style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:0.85rem;">
+      <div style="font-size:2rem;margin-bottom:0.5rem;">🧠</div>
+      Select a query above to run Prolog inference on the selected student's data.
+    </div>
+  </div>
+</main>
+
+<!-- ═══ EDIT MODAL ═══ -->
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-title" id="edit-modal-title">Edit Record</div>
+    <form id="edit-modal-form" onsubmit="submitEditModal(event)">
+      <div id="edit-modal-fields" class="form-grid"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
 </html>

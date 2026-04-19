@@ -46,6 +46,33 @@ def get_students():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/student/<int:roll_no>", methods=["DELETE"])
+def delete_student(roll_no):
+    try:
+        db.delete_student(roll_no)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Student {roll_no} deleted and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/<int:roll_no>", methods=["PUT"])
+def update_student(roll_no):
+    data = request.get_json()
+    required = ["name", "seat_no", "category", "year", "semester"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_student(
+            roll_no, data["name"], data["seat_no"],
+            data["category"], int(data["year"]), int(data["semester"])
+        )
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Student {roll_no} updated and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # SUBJECT endpoints
 # ════════════════════════════════════════════════════════════════════════════
@@ -70,6 +97,30 @@ def get_subjects():
         if semester:
             return jsonify(db.get_subjects_by_semester(int(semester)))
         return jsonify(db.get_all_subjects())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/subject/<subject_id>", methods=["DELETE"])
+def delete_subject(subject_id):
+    try:
+        db.delete_subject(subject_id)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Subject {subject_id} deleted and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/subject/<subject_id>", methods=["PUT"])
+def update_subject(subject_id):
+    data = request.get_json()
+    required = ["subject_name", "credits", "semester"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_subject(subject_id, data["subject_name"], int(data["credits"]), int(data["semester"]))
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Subject {subject_id} updated and Prolog KB updated."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -107,6 +158,39 @@ def add_marks():
 def get_marks():
     try:
         return jsonify(db.get_all_marks())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/marks/<int:roll_no>/<subject_id>/<int:semester>", methods=["DELETE"])
+def delete_marks(roll_no, subject_id, semester):
+    try:
+        db.delete_marks(roll_no, subject_id, semester)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": "Marks deleted and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/marks/<int:roll_no>/<subject_id>/<int:semester>", methods=["PUT"])
+def update_marks(roll_no, subject_id, semester):
+    data = request.get_json()
+    required = ["cie_marks", "ese_marks", "credits_earned"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+
+    cie = int(data["cie_marks"])
+    ese = int(data["ese_marks"])
+    credits_earned = int(data["credits_earned"])
+    if not (0 <= cie <= 40):
+        return jsonify({"error": "CIE marks must be between 0 and 40"}), 400
+    if not (0 <= ese <= 60):
+        return jsonify({"error": "ESE marks must be between 0 and 60"}), 400
+
+    try:
+        db.update_marks(roll_no, subject_id, semester, cie, ese, credits_earned)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": "Marks updated and Prolog KB updated."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

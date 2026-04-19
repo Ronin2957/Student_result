@@ -37,14 +37,16 @@
 % SECTION 1 (auto-generated — replaced by Python)
 % ============================================================
 % --- Auto-generated facts ---
-student(1, 'ronit patil', 'A-1', 'OBC', 2, 3).
+student(1, 'ronit', '1', 'OBC', 2, 3).
 
+subject('IT 1', 'DB', 4).
 subject('IT01', 'M3', 3).
 subject('IT02', 'WDWB', 2).
 subject('IT03', 'ADSA', 3).
 subject('IT04', 'DBMS', 3).
 subject('IT05', 'AT', 3).
 
+marks(1, 'IT 1', 3, 35, 45, 80, 3).
 marks(1, 'IT01', 3, 23, 12, 35, 0).
 marks(1, 'IT02', 3, 32, 36, 68, 2).
 marks(1, 'IT03', 3, 35, 28, 63, 3).

@@ -60,6 +60,19 @@ def get_all_students():
     return execute_query("SELECT * FROM Student ORDER BY roll_no", fetch=True)
 
 
+def delete_student(roll_no):
+    """Delete a student by roll_no. Cascades to Marks and Result via FK."""
+    return execute_query("DELETE FROM Student WHERE roll_no = %s", (roll_no,))
+
+
+def update_student(roll_no, name, seat_no, category, year, semester):
+    q = """
+        UPDATE Student SET name=%s, seat_no=%s, category=%s, year=%s, semester=%s
+        WHERE roll_no=%s
+    """
+    return execute_query(q, (name, seat_no, category, year, semester, roll_no))
+
+
 # ─── Subject helpers ─────────────────────────────────────────
 def insert_subject(subject_id, subject_name, credits, semester):
     q = """
@@ -81,6 +94,19 @@ def get_subjects_by_semester(semester):
         "SELECT subject_id, subject_name, credits, semester FROM Subject WHERE semester = %s ORDER BY subject_id",
         (semester,), fetch=True
     )
+
+
+def delete_subject(subject_id):
+    """Delete a subject by subject_id. Cascades to Marks via FK."""
+    return execute_query("DELETE FROM Subject WHERE subject_id = %s", (subject_id,))
+
+
+def update_subject(subject_id, subject_name, credits, semester):
+    q = """
+        UPDATE Subject SET subject_name=%s, credits=%s, semester=%s
+        WHERE subject_id=%s
+    """
+    return execute_query(q, (subject_name, credits, semester, subject_id))
 
 
 # ─── Marks helpers ───────────────────────────────────────────
@@ -105,6 +131,22 @@ def get_all_marks():
         ORDER BY m.roll_no, m.semester
     """
     return execute_query(q, fetch=True)
+
+
+def delete_marks(roll_no, subject_id, semester):
+    """Delete a marks entry by composite key."""
+    return execute_query(
+        "DELETE FROM Marks WHERE roll_no = %s AND subject_id = %s AND semester = %s",
+        (roll_no, subject_id, semester)
+    )
+
+
+def update_marks(roll_no, subject_id, semester, cie_marks, ese_marks, credits_earned):
+    q = """
+        UPDATE Marks SET cie_marks=%s, ese_marks=%s, credits_earned=%s
+        WHERE roll_no=%s AND subject_id=%s AND semester=%s
+    """
+    return execute_query(q, (cie_marks, ese_marks, credits_earned, roll_no, subject_id, semester))
 
 
 # ─── Result helpers ──────────────────────────────────────────

@@ -1,5 +1,5 @@
 """
-db.py — MySQL connection & helper utilities
+db.py — MySQL connection & helper utilities (Component-Based Marks System)
 Uses mysql-connector-python.
 Ensure XAMPP MySQL is running on port 3306.
 """
@@ -97,7 +97,7 @@ def get_subjects_by_semester(semester):
 
 
 def delete_subject(subject_id):
-    """Delete a subject by subject_id. Cascades to Marks via FK."""
+    """Delete a subject by subject_id. Cascades to Components and Marks via FK."""
     return execute_query("DELETE FROM Subject WHERE subject_id = %s", (subject_id,))
 
 
@@ -109,44 +109,124 @@ def update_subject(subject_id, subject_name, credits, semester):
     return execute_query(q, (subject_name, credits, semester, subject_id))
 
 
-# ─── Marks helpers ───────────────────────────────────────────
-def insert_marks(roll_no, subject_id, semester, cie_marks, ese_marks, credits_earned):
+# ─── Component helpers ──────────────────────────────────────
+def insert_component(subject_id, component_name, max_marks, passing_marks=0):
     q = """
-        INSERT INTO Marks (roll_no, subject_id, semester, cie_marks, ese_marks, credits_earned)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE
-            cie_marks=VALUES(cie_marks), ese_marks=VALUES(ese_marks), credits_earned=VALUES(credits_earned)
+        INSERT INTO Component (subject_id, component_name, max_marks, passing_marks)
+        VALUES (%s, %s, %s, %s)
     """
-    return execute_query(q, (roll_no, subject_id, semester, cie_marks, ese_marks, credits_earned))
+    return execute_query(q, (subject_id, component_name, max_marks, passing_marks))
 
 
-def get_all_marks():
+def get_components_by_subject(subject_id):
+    """Return all components for a given subject."""
+    return execute_query(
+        "SELECT component_id, subject_id, component_name, max_marks, passing_marks FROM Component WHERE subject_id = %s ORDER BY component_id",
+        (subject_id,), fetch=True
+    )
+
+
+def get_all_components():
+    """Return all components with subject info."""
     q = """
-        SELECT m.roll_no, s_t.name AS student_name, m.subject_id,
-               sub.subject_name, m.semester, m.cie_marks, m.ese_marks, m.total_marks,
-               m.credits_earned
-        FROM Marks m
-        JOIN Student s_t ON m.roll_no = s_t.roll_no
-        JOIN Subject sub ON m.subject_id = sub.subject_id
-        ORDER BY m.roll_no, m.semester
+        SELECT c.component_id, c.subject_id, s.subject_name, c.component_name, c.max_marks, c.passing_marks
+        FROM Component c
+        JOIN Subject s ON c.subject_id = s.subject_id
+        ORDER BY c.subject_id, c.component_id
     """
     return execute_query(q, fetch=True)
 
 
-def delete_marks(roll_no, subject_id, semester):
-    """Delete a marks entry by composite key."""
-    return execute_query(
-        "DELETE FROM Marks WHERE roll_no = %s AND subject_id = %s AND semester = %s",
-        (roll_no, subject_id, semester)
-    )
+def delete_component(component_id):
+    """Delete a component. Cascades to Marks via FK."""
+    return execute_query("DELETE FROM Component WHERE component_id = %s", (component_id,))
 
 
-def update_marks(roll_no, subject_id, semester, cie_marks, ese_marks, credits_earned):
+def update_component(component_id, component_name, max_marks, passing_marks):
     q = """
-        UPDATE Marks SET cie_marks=%s, ese_marks=%s, credits_earned=%s
-        WHERE roll_no=%s AND subject_id=%s AND semester=%s
+        UPDATE Component SET component_name=%s, max_marks=%s, passing_marks=%s
+        WHERE component_id=%s
     """
-    return execute_query(q, (cie_marks, ese_marks, credits_earned, roll_no, subject_id, semester))
+    return execute_query(q, (component_name, max_marks, passing_marks, component_id))
+
+
+# ─── Marks helpers ───────────────────────────────────────────
+def insert_marks(roll_no, component_id, semester, obtained_marks, credits_earned):
+    q = """
+        INSERT INTO Marks (roll_no, component_id, semester, obtained_marks, credits_earned)
+        VALUES (%s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE
+            obtained_marks=VALUES(obtained_marks), credits_earned=VALUES(credits_earned)
+    """
+    return execute_query(q, (roll_no, component_id, semester, obtained_marks, credits_earned))
+
+
+def insert_marks_batch(roll_no, semester, marks_list, credits_earned):
+    """
+    Insert marks for multiple components at once.
+    marks_list: [{ component_id, obtained_marks }, ...]
+    """
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    try:
+        for m in marks_list:
+            cursor.execute("""
+                INSERT INTO Marks (roll_no, component_id, semester, obtained_marks, credits_earned)
+                VALUES (%s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    obtained_marks=VALUES(obtained_marks), credits_earned=VALUES(credits_earned)
+            """, (roll_no, int(m["component_id"]), semester, int(m["obtained_marks"]), credits_earned))
+        conn.commit()
+        return {"rowcount": len(marks_list)}
+    except Error as e:
+        conn.rollback()
+        raise e
+    finally:
+        cursor.close()
+        conn.close()
+
+
+def get_all_marks():
+    q = """
+        SELECT m.mark_id, m.roll_no, st.name AS student_name,
+               c.subject_id, sub.subject_name,
+               c.component_id, c.component_name, c.max_marks,
+               m.semester, m.obtained_marks, m.credits_earned
+        FROM Marks m
+        JOIN Student st ON m.roll_no = st.roll_no
+        JOIN Component c ON m.component_id = c.component_id
+        JOIN Subject sub ON c.subject_id = sub.subject_id
+        ORDER BY m.roll_no, m.semester, c.subject_id, c.component_id
+    """
+    return execute_query(q, fetch=True)
+
+
+def get_marks_by_subject(roll_no, subject_id, semester):
+    """Return all component marks for a student in a given subject and semester."""
+    q = """
+        SELECT m.mark_id, m.roll_no, c.component_id, c.component_name, c.max_marks,
+               m.obtained_marks, m.credits_earned, c.passing_marks
+        FROM Marks m
+        JOIN Component c ON m.component_id = c.component_id
+        WHERE m.roll_no = %s AND c.subject_id = %s AND m.semester = %s
+        ORDER BY c.component_id
+    """
+    return execute_query(q, (roll_no, subject_id, semester), fetch=True)
+
+
+def delete_marks_by_subject(roll_no, subject_id, semester):
+    """Delete all marks for a student+subject+semester."""
+    q = """
+        DELETE m FROM Marks m
+        JOIN Component c ON m.component_id = c.component_id
+        WHERE m.roll_no = %s AND c.subject_id = %s AND m.semester = %s
+    """
+    return execute_query(q, (roll_no, subject_id, semester))
+
+
+def delete_marks(mark_id):
+    """Delete a single marks entry by mark_id."""
+    return execute_query("DELETE FROM Marks WHERE mark_id = %s", (mark_id,))
 
 
 # ─── Result helpers ──────────────────────────────────────────
@@ -173,11 +253,16 @@ def get_all_results():
 
 
 def get_marks_for_prolog():
-    """Raw marks rows for Prolog fact generation."""
-    return execute_query(
-        "SELECT roll_no, subject_id, semester, cie_marks, ese_marks, total_marks, credits_earned FROM Marks",
-        fetch=True
-    )
+    """Raw marks rows for Prolog fact generation — component-based."""
+    q = """
+        SELECT m.roll_no, c.subject_id, m.semester,
+               c.component_name, c.max_marks, c.passing_marks,
+               m.obtained_marks, m.credits_earned
+        FROM Marks m
+        JOIN Component c ON m.component_id = c.component_id
+        ORDER BY m.roll_no, c.subject_id, c.component_id
+    """
+    return execute_query(q, fetch=True)
 
 
 def get_subjects_for_prolog():
@@ -215,66 +300,100 @@ def get_cgpa(roll_no):
     return {"cgpa": None, "cumulative_credits": 0}
 
 
-# ─── Subject-level analysis (reasoning) ─────────────────────
+# ─── Subject-level analysis (reasoning) — Component-Based ───
 def get_subject_analysis(roll_no, semester):
     """
     Return per-subject breakdown for a student+semester.
-    Includes pass/fail status, reasons, grade points, and grace eligibility.
+    Aggregates all component marks per subject, computes total and max,
+    determines pass/fail per component and overall.
     """
+    # Get all marks with component info for this student+semester
     q = """
-        SELECT m.subject_id, sub.subject_name, sub.credits,
-               m.cie_marks, m.ese_marks, m.total_marks
+        SELECT c.subject_id, sub.subject_name, sub.credits,
+               c.component_id, c.component_name, c.max_marks, c.passing_marks,
+               m.obtained_marks
         FROM Marks m
-        JOIN Subject sub ON m.subject_id = sub.subject_id
+        JOIN Component c ON m.component_id = c.component_id
+        JOIN Subject sub ON c.subject_id = sub.subject_id
         WHERE m.roll_no = %s AND m.semester = %s
-        ORDER BY sub.subject_id
+        ORDER BY c.subject_id, c.component_id
     """
     rows = execute_query(q, (roll_no, semester), fetch=True)
 
-    analysis = []
+    # Group by subject
+    subjects = {}
     for row in rows:
-        cie = row["cie_marks"]
-        ese = row["ese_marks"]
-        total = row["total_marks"]
-        credits = row["credits"]
+        sid = row["subject_id"]
+        if sid not in subjects:
+            subjects[sid] = {
+                "subject_id": sid,
+                "subject_name": row["subject_name"],
+                "credits": row["credits"],
+                "components": [],
+                "total_obtained": 0,
+                "total_max": 0,
+            }
+        subjects[sid]["components"].append({
+            "component_name": row["component_name"],
+            "max_marks": row["max_marks"],
+            "passing_marks": row["passing_marks"],
+            "obtained_marks": row["obtained_marks"],
+        })
+        subjects[sid]["total_obtained"] += row["obtained_marks"]
+        subjects[sid]["total_max"] += row["max_marks"]
 
-        passes_cie = cie >= 18
-        passes_ese = ese >= 24
-        passed = passes_cie and passes_ese
+    analysis = []
+    for sid, s in subjects.items():
+        total = s["total_obtained"]
+        total_max = s["total_max"]
+        credits = s["credits"]
 
-        # Grade points (10-point scale)
-        if total >= 91: gp = 10
-        elif total >= 81: gp = 9
-        elif total >= 71: gp = 8
-        elif total >= 61: gp = 7
-        elif total >= 55: gp = 6
-        elif total >= 50: gp = 5
-        elif total >= 40: gp = 4
+        # Check per-component passing
+        failed_components = []
+        for comp in s["components"]:
+            if comp["passing_marks"] > 0 and comp["obtained_marks"] < comp["passing_marks"]:
+                failed_components.append(comp)
+
+        passed = len(failed_components) == 0
+
+        # Compute percentage for grade points (normalize to 100 scale)
+        if total_max > 0:
+            pct = (total / total_max) * 100
+        else:
+            pct = 0
+
+        # Grade points (10-point scale based on percentage)
+        if pct >= 91: gp = 10
+        elif pct >= 81: gp = 9
+        elif pct >= 71: gp = 8
+        elif pct >= 61: gp = 7
+        elif pct >= 55: gp = 6
+        elif pct >= 50: gp = 5
+        elif pct >= 40: gp = 4
         else: gp = 0
 
-        # Build reason
+        # Build reasons
         reasons = []
-        if not passes_cie:
-            reasons.append(f"CIE = {cie} (need ≥ 18, short by {18 - cie})")
-        if not passes_ese:
-            reasons.append(f"ESE = {ese} (need ≥ 24, short by {24 - ese})")
+        for comp in failed_components:
+            short = comp["passing_marks"] - comp["obtained_marks"]
+            reasons.append(
+                f"{comp['component_name']} = {comp['obtained_marks']} (need ≥ {comp['passing_marks']}, short by {short})"
+            )
 
-        # Grace eligibility for this subject
+        # Grace eligibility: if only 1 component failed and needs <= 6 marks
         grace_needed = 0
-        if not passed:
-            if not passes_ese:
-                grace_needed = 24 - ese
-            elif not passes_cie:
-                grace_needed = 18 - cie
+        if not passed and len(failed_components) == 1:
+            grace_needed = failed_components[0]["passing_marks"] - failed_components[0]["obtained_marks"]
         grace_eligible = grace_needed > 0 and grace_needed <= 6
 
         analysis.append({
-            "subject_id": row["subject_id"],
-            "subject_name": row["subject_name"],
+            "subject_id": sid,
+            "subject_name": s["subject_name"],
             "credits": credits,
-            "cie_marks": cie,
-            "ese_marks": ese,
+            "components": s["components"],
             "total_marks": total,
+            "max_marks": total_max,
+            "percentage": round(pct, 2),
             "grade_points": gp,
             "weighted_gp": gp * credits,
             "passed": passed,

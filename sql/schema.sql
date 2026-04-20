@@ -1,6 +1,6 @@
 -- ============================================================
 -- PARADIGM STUDENT RESULT SYSTEM
--- MySQL Schema — 4 Normalized Tables
+-- MySQL Schema — Component-Based Marks System
 -- Run this in phpMyAdmin or MySQL CLI after starting XAMPP
 -- ============================================================
 
@@ -35,27 +35,39 @@ CREATE TABLE IF NOT EXISTS Subject (
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- TABLE 3: Marks
--- Passing: CIE >= 18 (out of 40), ESE >= 24 (out of 60)
--- total_marks = cie_marks + ese_marks (out of 100)
+-- TABLE 3: Component
+-- Each subject can have multiple assessment components
+-- (e.g. I1 = Internal, E1 = External, T1 = Term Work, O1 = Oral)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS Marks (
-    roll_no        INT         NOT NULL,
-    subject_id     VARCHAR(20) NOT NULL,
-    semester       INT         NOT NULL,
-    cie_marks      INT         NOT NULL DEFAULT 0,
-    ese_marks      INT         NOT NULL DEFAULT 0,
-    credits_earned INT         NOT NULL DEFAULT 0,
-    total_marks    INT         GENERATED ALWAYS AS (cie_marks + ese_marks) STORED,
-    PRIMARY KEY (roll_no, subject_id, semester),
-    CONSTRAINT fk_marks_student  FOREIGN KEY (roll_no)     REFERENCES Student(roll_no)    ON DELETE CASCADE,
-    CONSTRAINT fk_marks_subject  FOREIGN KEY (subject_id)  REFERENCES Subject(subject_id) ON DELETE CASCADE,
-    CONSTRAINT chk_cie  CHECK (cie_marks  BETWEEN 0 AND 40),
-    CONSTRAINT chk_ese  CHECK (ese_marks  BETWEEN 0 AND 60)
+CREATE TABLE IF NOT EXISTS Component (
+    component_id   INT          NOT NULL AUTO_INCREMENT,
+    subject_id     VARCHAR(20)  NOT NULL,
+    component_name VARCHAR(10)  NOT NULL,
+    max_marks      INT          NOT NULL,
+    passing_marks  INT          NOT NULL DEFAULT 0,
+    PRIMARY KEY (component_id),
+    CONSTRAINT fk_comp_subject FOREIGN KEY (subject_id) REFERENCES Subject(subject_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 -- ============================================================
--- TABLE 4: Result  (populated via Prolog queries)
+-- TABLE 4: Marks
+-- Per-student, per-component obtained marks
+-- ============================================================
+CREATE TABLE IF NOT EXISTS Marks (
+    mark_id        INT  NOT NULL AUTO_INCREMENT,
+    roll_no        INT  NOT NULL,
+    component_id   INT  NOT NULL,
+    semester       INT  NOT NULL,
+    obtained_marks INT  NOT NULL DEFAULT 0,
+    credits_earned INT  NOT NULL DEFAULT 0,
+    PRIMARY KEY (mark_id),
+    UNIQUE KEY uq_marks (roll_no, component_id, semester),
+    CONSTRAINT fk_marks_student   FOREIGN KEY (roll_no)      REFERENCES Student(roll_no)      ON DELETE CASCADE,
+    CONSTRAINT fk_marks_component FOREIGN KEY (component_id)  REFERENCES Component(component_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ============================================================
+-- TABLE 5: Result  (populated via Prolog queries)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS Result (
     roll_no            INT          NOT NULL,

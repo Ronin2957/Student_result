@@ -35,7 +35,7 @@
       <div class="card-icon purple">📋</div>
       <div>
         <div class="card-title">Data Input</div>
-        <div class="card-subtitle">Add students, subjects &amp; marks to the database</div>
+        <div class="card-subtitle">Add students, subjects, components &amp; marks to the database</div>
       </div>
     </div>
 
@@ -43,6 +43,7 @@
     <div class="tabs">
       <button class="tab-btn active" id="tab-student" onclick="switchTab('student')">👤 Student</button>
       <button class="tab-btn" id="tab-subject" onclick="switchTab('subject')">📚 Subject</button>
+      <button class="tab-btn" id="tab-component" onclick="switchTab('component')">🧩 Component</button>
       <button class="tab-btn" id="tab-marks" onclick="switchTab('marks')">📝 Marks</button>
     </div>
 
@@ -50,7 +51,7 @@
     <div id="data-alert" class="hidden"></div>
 
     <!-- Student Form -->
-    <form id="form-student" onsubmit="submitStudent(event)">
+    <form id="form-student" onsubmit="submitStudent(event); return false;">
       <div class="form-grid">
         <div class="form-group">
           <label for="s-roll">Roll Number</label>
@@ -90,7 +91,7 @@
     </form>
 
     <!-- Subject Form -->
-    <form id="form-subject" class="hidden" onsubmit="submitSubject(event)">
+    <form id="form-subject" class="hidden" onsubmit="submitSubject(event); return false;">
       <div class="form-grid">
         <div class="form-group">
           <label for="sub-id">Subject ID</label>
@@ -116,8 +117,33 @@
       <div><button type="submit" class="btn btn-primary" id="submit-subject">➕ Add Subject</button></div>
     </form>
 
+    <!-- Component Form -->
+    <form id="form-component" class="hidden" onsubmit="submitComponent(event); return false;">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="comp-subid">Subject</label>
+          <select id="comp-subid" required>
+            <option value="">— Select subject —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="comp-name">Component Name</label>
+          <input id="comp-name" type="text" placeholder="e.g. I1, E1, T1, O1" required>
+        </div>
+        <div class="form-group">
+          <label for="comp-max">Max Marks</label>
+          <input id="comp-max" type="number" min="1" placeholder="e.g. 40" required>
+        </div>
+        <div class="form-group">
+          <label for="comp-pass">Passing Marks</label>
+          <input id="comp-pass" type="number" min="0" placeholder="e.g. 18 (0 = none)" value="0">
+        </div>
+      </div>
+      <div><button type="submit" class="btn btn-primary" id="submit-component">➕ Add Component</button></div>
+    </form>
+
     <!-- Marks Form -->
-    <form id="form-marks" class="hidden" onsubmit="submitMarks(event)">
+    <form id="form-marks" class="hidden" onsubmit="submitMarks(event); return false;">
       <div class="form-grid">
         <div class="form-group">
           <label for="m-roll">Roll Number</label>
@@ -133,27 +159,25 @@
         </div>
         <div class="form-group">
           <label for="m-subid">Subject</label>
-          <select id="m-subid" required disabled>
+          <select id="m-subid" required disabled onchange="loadSubjectComponents()">
             <option value="">— Select semester first —</option>
           </select>
-        </div>
-        <div class="form-group">
-          <label for="m-cie">CIE Marks (max 40)</label>
-          <input id="m-cie" type="number" min="0" max="40" placeholder="0 – 40" required oninput="updateLiveTotal()">
-        </div>
-        <div class="form-group">
-          <label for="m-ese">ESE Marks (max 60)</label>
-          <input id="m-ese" type="number" min="0" max="60" placeholder="0 – 60" required oninput="updateLiveTotal()">
         </div>
         <div class="form-group">
           <label for="m-credits">Credits Earned</label>
           <input id="m-credits" type="number" min="0" max="6" placeholder="e.g. 3" required>
         </div>
-        <div class="form-group">
-          <label>Live Total</label>
-          <div id="live-total" style="padding:8px 10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:6px;font-weight:700;color:var(--text-accent, #6366f1);font-size:0.9rem;">0 / 100</div>
-        </div>
       </div>
+
+      <!-- Dynamic component inputs container -->
+      <div id="marksContainer"></div>
+
+      <!-- Live Total -->
+      <div id="live-total-wrapper" class="hidden" style="margin-bottom:0.85rem;">
+        <label>Live Total</label>
+        <div id="live-total" style="padding:8px 10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:6px;font-weight:700;color:var(--text-accent, #6366f1);font-size:0.9rem;">0 / 0</div>
+      </div>
+
       <div><button type="submit" class="btn btn-primary" id="submit-marks">➕ Add Marks</button></div>
     </form>
 
@@ -182,19 +206,30 @@
           <span id="subjects-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
         </div>
         <div class="table-wrapper"><table><thead><tr>
-          <th>Subject ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th><th>Actions</th>
-        </tr></thead><tbody id="subjects-tbody"><tr><td colspan="5" class="empty-table">No subjects added yet.</td></tr></tbody></table></div>
+          <th>Subject ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th><th>Components</th><th>Actions</th>
+        </tr></thead><tbody id="subjects-tbody"><tr><td colspan="6" class="empty-table">No subjects added yet.</td></tr></tbody></table></div>
+      </div>
+
+      <!-- Components Table -->
+      <div class="table-section">
+        <div class="table-section-header">
+          <div class="table-section-title"><span class="table-dot green"></span> Components</div>
+          <span id="components-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
+        </div>
+        <div class="table-wrapper"><table><thead><tr>
+          <th>ID</th><th>Subject</th><th>Component</th><th>Max Marks</th><th>Pass Marks</th><th>Actions</th>
+        </tr></thead><tbody id="components-tbody"><tr><td colspan="6" class="empty-table">No components added yet.</td></tr></tbody></table></div>
       </div>
 
       <!-- Marks Table -->
       <div class="table-section">
         <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot green"></span> Marks</div>
+          <div class="table-section-title"><span class="table-dot amber"></span> Marks</div>
           <span id="marks-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
         </div>
         <div class="table-wrapper"><table><thead><tr>
-          <th>Roll</th><th>Student</th><th>Subject ID</th><th>Subject</th><th>Sem</th><th>CIE(40)</th><th>ESE(60)</th><th>Total(100)</th><th>Credits</th><th>Status</th><th>Actions</th>
-        </tr></thead><tbody id="marks-tbody"><tr><td colspan="11" class="empty-table">No marks added yet.</td></tr></tbody></table></div>
+          <th>Roll</th><th>Student</th><th>Subject</th><th>Component</th><th>Sem</th><th>Obtained</th><th>Max</th><th>Credits</th><th>Actions</th>
+        </tr></thead><tbody id="marks-tbody"><tr><td colspan="9" class="empty-table">No marks added yet.</td></tr></tbody></table></div>
       </div>
 
       <!-- Results Table -->

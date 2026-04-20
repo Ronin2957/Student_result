@@ -1,5 +1,6 @@
 """
 app.py — Flask API server (backend bridge)
+Component-Based Marks System
 Start with: python app.py
 Runs on http://localhost:5000
 """
@@ -9,7 +10,7 @@ import db
 import prolog_bridge
 
 app = Flask(__name__)
-CORS(app)  # Allow React dev server (port 5173) to call this API
+CORS(app)  # Allow frontend to call this API
 
 
 # ─── Health check ───────────────────────────────────────────────────────────
@@ -126,27 +127,104 @@ def update_subject(subject_id):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# MARKS endpoints
+# COMPONENT endpoints
+# ════════════════════════════════════════════════════════════════════════════
+@app.route("/api/component", methods=["POST"])
+def add_component():
+    data = request.get_json()
+    required = ["subject_id", "component_name", "max_marks"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        passing = int(data.get("passing_marks", 0))
+        db.insert_component(data["subject_id"], data["component_name"], int(data["max_marks"]), passing)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": "Component added and Prolog KB updated."}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/components/<subject_id>", methods=["GET"])
+def get_components(subject_id):
+    """Return all components for a given subject."""
+    try:
+        return jsonify(db.get_components_by_subject(subject_id))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/components", methods=["GET"])
+def get_all_components():
+    """Return all components with subject info."""
+    try:
+        return jsonify(db.get_all_components())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/component/<int:component_id>", methods=["DELETE"])
+def delete_component(component_id):
+    try:
+        db.delete_component(component_id)
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Component {component_id} deleted and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/component/<int:component_id>", methods=["PUT"])
+def update_component(component_id):
+    data = request.get_json()
+    required = ["component_name", "max_marks", "passing_marks"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_component(component_id, data["component_name"], int(data["max_marks"]), int(data["passing_marks"]))
+        prolog_bridge.regenerate_kb()
+        return jsonify({"message": f"Component {component_id} updated and Prolog KB updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# MARKS endpoints (Component-Based)
 # ════════════════════════════════════════════════════════════════════════════
 @app.route("/api/marks", methods=["POST"])
 def add_marks():
+    """
+    Accept dynamic component-based marks.
+    Body: {
+        roll_no, subject_id, semester, credits_earned,
+        marks: [ { component_id, obtained_marks }, ... ]
+    }
+    """
     data = request.get_json()
-    required = ["roll_no", "subject_id", "semester", "cie_marks", "ese_marks", "credits_earned"]
+    required = ["roll_no", "subject_id", "semester", "credits_earned", "marks"]
     if not all(k in data for k in required):
         return jsonify({"error": f"Missing fields. Required: {required}"}), 400
 
-    cie = int(data["cie_marks"])
-    ese = int(data["ese_marks"])
-    credits_earned = int(data["credits_earned"])
-    if not (0 <= cie <= 40):
-        return jsonify({"error": "CIE marks must be between 0 and 40"}), 400
-    if not (0 <= ese <= 60):
-        return jsonify({"error": "ESE marks must be between 0 and 60"}), 400
+    marks_list = data["marks"]
+    if not isinstance(marks_list, list) or len(marks_list) == 0:
+        return jsonify({"error": "marks must be a non-empty array of { component_id, obtained_marks }"}), 400
+
+    # Validate each component's marks against max
+    components = db.get_components_by_subject(data["subject_id"])
+    comp_map = {c["component_id"]: c for c in components}
+
+    for m in marks_list:
+        cid = int(m["component_id"])
+        obtained = int(m["obtained_marks"])
+        if cid not in comp_map:
+            return jsonify({"error": f"Component ID {cid} does not belong to subject {data['subject_id']}"}), 400
+        if not (0 <= obtained <= comp_map[cid]["max_marks"]):
+            return jsonify({"error": f"Marks for {comp_map[cid]['component_name']} must be between 0 and {comp_map[cid]['max_marks']}"}), 400
 
     try:
-        db.insert_marks(
-            int(data["roll_no"]), data["subject_id"],
-            int(data["semester"]), cie, ese, credits_earned
+        db.insert_marks_batch(
+            int(data["roll_no"]),
+            int(data["semester"]),
+            marks_list,
+            int(data["credits_earned"])
         )
         prolog_bridge.regenerate_kb()
         return jsonify({"message": "Marks added and Prolog KB updated."}), 201
@@ -165,7 +243,7 @@ def get_marks():
 @app.route("/api/marks/<int:roll_no>/<subject_id>/<int:semester>", methods=["DELETE"])
 def delete_marks(roll_no, subject_id, semester):
     try:
-        db.delete_marks(roll_no, subject_id, semester)
+        db.delete_marks_by_subject(roll_no, subject_id, semester)
         prolog_bridge.regenerate_kb()
         return jsonify({"message": "Marks deleted and Prolog KB updated."})
     except Exception as e:
@@ -174,21 +252,31 @@ def delete_marks(roll_no, subject_id, semester):
 
 @app.route("/api/marks/<int:roll_no>/<subject_id>/<int:semester>", methods=["PUT"])
 def update_marks(roll_no, subject_id, semester):
+    """
+    Update marks for a student+subject+semester.
+    Body: { credits_earned, marks: [ { component_id, obtained_marks }, ... ] }
+    """
     data = request.get_json()
-    required = ["cie_marks", "ese_marks", "credits_earned"]
+    required = ["credits_earned", "marks"]
     if not all(k in data for k in required):
         return jsonify({"error": f"Missing fields. Required: {required}"}), 400
 
-    cie = int(data["cie_marks"])
-    ese = int(data["ese_marks"])
-    credits_earned = int(data["credits_earned"])
-    if not (0 <= cie <= 40):
-        return jsonify({"error": "CIE marks must be between 0 and 40"}), 400
-    if not (0 <= ese <= 60):
-        return jsonify({"error": "ESE marks must be between 0 and 60"}), 400
+    marks_list = data["marks"]
+    components = db.get_components_by_subject(subject_id)
+    comp_map = {c["component_id"]: c for c in components}
+
+    for m in marks_list:
+        cid = int(m["component_id"])
+        obtained = int(m["obtained_marks"])
+        if cid not in comp_map:
+            return jsonify({"error": f"Component ID {cid} does not belong to subject {subject_id}"}), 400
+        if not (0 <= obtained <= comp_map[cid]["max_marks"]):
+            return jsonify({"error": f"Marks for {comp_map[cid]['component_name']} must be between 0 and {comp_map[cid]['max_marks']}"}), 400
 
     try:
-        db.update_marks(roll_no, subject_id, semester, cie, ese, credits_earned)
+        # Delete existing then re-insert
+        db.delete_marks_by_subject(roll_no, subject_id, semester)
+        db.insert_marks_batch(roll_no, semester, marks_list, int(data["credits_earned"]))
         prolog_bridge.regenerate_kb()
         return jsonify({"message": "Marks updated and Prolog KB updated."})
     except Exception as e:

@@ -2,6 +2,10 @@
 prolog_bridge.py — Handles:
   1. Auto-generating Prolog facts from DB and writing to knowledge_base.pl
   2. Running SWI-Prolog queries via subprocess and parsing results
+
+  Component-Based Marks System:
+  Facts generated:
+    marks(RollNo, SubId, Sem, ComponentName, MaxMarks, PassingMarks, Obtained, CreditsEarned).
 """
 import os
 import re
@@ -44,9 +48,11 @@ def generate_facts() -> str:
 
     lines.append("")
     for m in marks:
+        comp = _sanitize(m["component_name"])
         lines.append(
             f"marks({m['roll_no']}, '{m['subject_id']}', {m['semester']}, "
-            f"{m['cie_marks']}, {m['ese_marks']}, {m['total_marks']}, {m['credits_earned']})."
+            f"'{comp}', {m['max_marks']}, {m['passing_marks']}, "
+            f"{m['obtained_marks']}, {m['credits_earned']})."
         )
 
     return "\n".join(lines)

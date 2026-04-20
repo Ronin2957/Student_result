@@ -58,16 +58,31 @@ let prologResults = {};    // { query_type: result_obj }
 let prologAnalysis = [];   // subject-level analysis
 let prologStudents = [];   // cached students list
 let editModalCallback = null;
+let currentComponents = []; // components for currently selected subject in marks form
 
 /* ═══════════════════════════════════════════════════════════════
    TAB SWITCHING
    ═══════════════════════════════════════════════════════════════ */
 function switchTab(tab) {
-  ['student', 'subject', 'marks'].forEach(t => {
+  ['student', 'subject', 'component', 'marks'].forEach(t => {
     document.getElementById('form-' + t).classList.toggle('hidden', t !== tab);
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
+  // Remember the active tab so it survives page reloads
+  sessionStorage.setItem('gradematrix-active-tab', tab);
+  // Load subjects into component form dropdown when switching to component tab
+  if (tab === 'component') {
+    loadAllSubjectsDropdown();
+  }
 }
+
+// Restore the last active tab on page load (e.g. after Live Server reload)
+document.addEventListener('DOMContentLoaded', () => {
+  const savedTab = sessionStorage.getItem('gradematrix-active-tab');
+  if (savedTab && ['student', 'subject', 'component', 'marks'].includes(savedTab)) {
+    switchTab(savedTab);
+  }
+});
 
 /* ═══════════════════════════════════════════════════════════════
    ALERT HELPER
@@ -81,12 +96,40 @@ function showDataAlert(msg, type) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LIVE TOTAL
+   LIVE TOTAL (Component-Based)
    ═══════════════════════════════════════════════════════════════ */
 function updateLiveTotal() {
-  const cie = parseInt(document.getElementById('m-cie').value) || 0;
-  const ese = parseInt(document.getElementById('m-ese').value) || 0;
-  document.getElementById('live-total').textContent = (cie + ese) + ' / 100';
+  const inputs = document.querySelectorAll('#marksContainer input[type="number"]');
+  let total = 0;
+  let maxTotal = 0;
+  inputs.forEach(inp => {
+    total += parseInt(inp.value) || 0;
+    maxTotal += parseInt(inp.getAttribute('data-max')) || 0;
+  });
+  const el = document.getElementById('live-total');
+  if (el) el.textContent = total + ' / ' + maxTotal;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD ALL SUBJECTS INTO DROPDOWN (for component form)
+   ═══════════════════════════════════════════════════════════════ */
+async function loadAllSubjectsDropdown() {
+  const sel = document.getElementById('comp-subid');
+  try {
+    const res = await fetch(API + '/subjects');
+    const data = await res.json();
+    sel.innerHTML = '<option value="">— Select subject —</option>';
+    if (Array.isArray(data)) {
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.subject_id;
+        opt.textContent = '[' + s.subject_id + '] ' + s.subject_name + ' (Sem ' + s.semester + ')';
+        sel.appendChild(opt);
+      });
+    }
+  } catch {
+    sel.innerHTML = '<option value="">Error loading subjects</option>';
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -96,6 +139,11 @@ async function loadSemesterSubjects() {
   const sem = document.getElementById('m-sem').value;
   const sel = document.getElementById('m-subid');
   sel.innerHTML = '';
+  // Clear components when semester changes
+  document.getElementById('marksContainer').innerHTML = '';
+  document.getElementById('live-total-wrapper').classList.add('hidden');
+  currentComponents = [];
+
   if (!sem) {
     sel.innerHTML = '<option value="">— Select semester first —</option>';
     sel.disabled = true;
@@ -120,6 +168,60 @@ async function loadSemesterSubjects() {
   } catch {
     sel.innerHTML = '<option value="">Error loading subjects</option>';
     sel.disabled = true;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LOAD SUBJECT COMPONENTS — Dynamic Input Rendering
+   ═══════════════════════════════════════════════════════════════ */
+async function loadSubjectComponents() {
+  const subjectId = document.getElementById('m-subid').value;
+  const container = document.getElementById('marksContainer');
+  container.innerHTML = '';
+  currentComponents = [];
+
+  if (!subjectId) {
+    document.getElementById('live-total-wrapper').classList.add('hidden');
+    return;
+  }
+
+  try {
+    const res = await fetch(API + '/components/' + subjectId);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      container.innerHTML = '<div style="padding:0.75rem;color:#94a3b8;font-size:0.82rem;border:1px dashed var(--border-main);border-radius:6px;text-align:center;">⚠️ No components defined for this subject. Add components first in the Component tab.</div>';
+      document.getElementById('live-total-wrapper').classList.add('hidden');
+      return;
+    }
+
+    currentComponents = data;
+
+    const grid = document.createElement('div');
+    grid.className = 'form-grid';
+    grid.style.marginBottom = '0.85rem';
+
+    data.forEach(comp => {
+      const div = document.createElement('div');
+      div.className = 'form-group';
+      const passInfo = comp.passing_marks > 0 ? ' · Pass: ' + comp.passing_marks : '';
+      div.innerHTML =
+        '<label for="comp-mark-' + comp.component_id + '">' + comp.component_name + ' (Max: ' + comp.max_marks + passInfo + ')</label>' +
+        '<input type="number" id="comp-mark-' + comp.component_id + '" ' +
+        'name="comp_' + comp.component_id + '" ' +
+        'min="0" max="' + comp.max_marks + '" ' +
+        'data-max="' + comp.max_marks + '" ' +
+        'data-compid="' + comp.component_id + '" ' +
+        'placeholder="0 – ' + comp.max_marks + '" required ' +
+        'oninput="updateLiveTotal()">';
+      grid.appendChild(div);
+    });
+
+    container.appendChild(grid);
+    document.getElementById('live-total-wrapper').classList.remove('hidden');
+    updateLiveTotal();
+  } catch {
+    container.innerHTML = '<div style="padding:0.75rem;color:#dc2626;font-size:0.82rem;">❌ Error loading components</div>';
   }
 }
 
@@ -167,8 +269,46 @@ async function submitSubject(e) {
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
 
+async function submitComponent(e) {
+  e.preventDefault();
+  try {
+    const res = await fetch(API + '/component', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        subject_id: document.getElementById('comp-subid').value,
+        component_name: document.getElementById('comp-name').value,
+        max_marks: document.getElementById('comp-max').value,
+        passing_marks: document.getElementById('comp-pass').value || 0,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showDataAlert('Component added & Prolog KB updated! ✨', 'success');
+    // Reset only the component-specific fields, keep subject selected
+    document.getElementById('comp-name').value = '';
+    document.getElementById('comp-max').value = '';
+    document.getElementById('comp-pass').value = '0';
+  } catch (err) { showDataAlert(err.message, 'error'); }
+}
+
 async function submitMarks(e) {
   e.preventDefault();
+
+  // Collect dynamic component marks
+  const marksList = [];
+  const inputs = document.querySelectorAll('#marksContainer input[type="number"]');
+  inputs.forEach(inp => {
+    marksList.push({
+      component_id: inp.getAttribute('data-compid'),
+      obtained_marks: inp.value,
+    });
+  });
+
+  if (marksList.length === 0) {
+    showDataAlert('No components to submit marks for. Select a subject with components.', 'error');
+    return;
+  }
+
   try {
     const res = await fetch(API + '/marks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -176,18 +316,15 @@ async function submitMarks(e) {
         roll_no: document.getElementById('m-roll').value,
         subject_id: document.getElementById('m-subid').value,
         semester: document.getElementById('m-sem').value,
-        cie_marks: document.getElementById('m-cie').value,
-        ese_marks: document.getElementById('m-ese').value,
         credits_earned: document.getElementById('m-credits').value,
+        marks: marksList,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     showDataAlert('Marks added & Prolog KB updated! ✨', 'success');
-    document.getElementById('m-cie').value = '';
-    document.getElementById('m-ese').value = '';
-    document.getElementById('m-credits').value = '';
-    document.getElementById('m-subid').value = '';
+    // Only clear the obtained marks inputs — keep form selections intact
+    inputs.forEach(inp => inp.value = '');
     updateLiveTotal();
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
@@ -200,14 +337,16 @@ async function fetchAllData() {
   btn.disabled = true;
   btn.textContent = '⏳ Loading...';
   try {
-    const [students, subjects, marks, results] = await Promise.all([
+    const [students, subjects, components, marks, results] = await Promise.all([
       fetch(API + '/students').then(r => r.json()),
       fetch(API + '/subjects').then(r => r.json()),
+      fetch(API + '/components').then(r => r.json()),
       fetch(API + '/marks').then(r => r.json()),
       fetch(API + '/results').then(r => r.json()),
     ]);
     renderStudentsTable(Array.isArray(students) ? students : []);
-    renderSubjectsTable(Array.isArray(subjects) ? subjects : []);
+    renderSubjectsTable(Array.isArray(subjects) ? subjects : [], Array.isArray(components) ? components : []);
+    renderComponentsTable(Array.isArray(components) ? components : []);
     renderMarksTable(Array.isArray(marks) ? marks : []);
     renderResultsTable(Array.isArray(results) ? results : []);
     document.getElementById('data-tables').classList.remove('hidden');
@@ -233,15 +372,46 @@ function renderStudentsTable(data) {
   </tr>`).join('');
 }
 
-function renderSubjectsTable(data) {
+function renderSubjectsTable(data, components) {
   const tbody = document.getElementById('subjects-tbody');
   document.getElementById('subjects-count').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
-  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="empty-table">No subjects added yet.</td></tr>'; return; }
-  tbody.innerHTML = data.map(s => `<tr>
+  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="empty-table">No subjects added yet.</td></tr>'; return; }
+
+  // Build component summary per subject
+  const compMap = {};
+  if (Array.isArray(components)) {
+    components.forEach(c => {
+      if (!compMap[c.subject_id]) compMap[c.subject_id] = [];
+      compMap[c.subject_id].push(c.component_name + '(' + c.max_marks + ')');
+    });
+  }
+
+  tbody.innerHTML = data.map(s => {
+    const compStr = compMap[s.subject_id] ? compMap[s.subject_id].join(', ') : '<span style="color:#94a3b8">None</span>';
+    return `<tr>
     <td>${s.subject_id}</td><td>${s.subject_name}</td><td>${s.credits}</td><td>${s.semester}</td>
+    <td style="font-size:0.78rem;">${compStr}</td>
     <td class="actions-cell">
       <button class="btn btn-edit btn-sm" onclick='editSubject(${JSON.stringify(s).replace(/'/g,"&#39;")})'>✏️</button>
       <button class="btn btn-danger btn-sm" onclick="deleteSubject('${s.subject_id}')">🗑️</button>
+    </td>
+  </tr>`;
+  }).join('');
+}
+
+function renderComponentsTable(data) {
+  const tbody = document.getElementById('components-tbody');
+  document.getElementById('components-count').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
+  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="empty-table">No components added yet.</td></tr>'; return; }
+  tbody.innerHTML = data.map(c => `<tr>
+    <td>${c.component_id}</td>
+    <td>[${c.subject_id}] ${c.subject_name || ''}</td>
+    <td><strong>${c.component_name}</strong></td>
+    <td>${c.max_marks}</td>
+    <td>${c.passing_marks || 0}</td>
+    <td class="actions-cell">
+      <button class="btn btn-edit btn-sm" onclick='editComponent(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteComponent(${c.component_id})">🗑️</button>
     </td>
   </tr>`).join('');
 }
@@ -249,18 +419,18 @@ function renderSubjectsTable(data) {
 function renderMarksTable(data) {
   const tbody = document.getElementById('marks-tbody');
   document.getElementById('marks-count').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
-  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="11" class="empty-table">No marks added yet.</td></tr>'; return; }
+  if (data.length === 0) { tbody.innerHTML = '<tr><td colspan="9" class="empty-table">No marks added yet.</td></tr>'; return; }
   tbody.innerHTML = data.map(m => {
-    const ok = m.cie_marks >= 18 && m.ese_marks >= 24;
     return `<tr>
-      <td>${m.roll_no}</td><td>${m.student_name}</td><td>${m.subject_id}</td><td>${m.subject_name}</td><td>${m.semester}</td>
-      <td>${m.cie_marks}</td><td>${m.ese_marks}</td>
-      <td><strong style="color:#6366f1">${m.total_marks}</strong></td>
+      <td>${m.roll_no}</td><td>${m.student_name}</td>
+      <td>[${m.subject_id}] ${m.subject_name}</td>
+      <td><strong>${m.component_name}</strong></td>
+      <td>${m.semester}</td>
+      <td>${m.obtained_marks}</td>
+      <td>${m.max_marks}</td>
       <td><strong style="color:#0891b2">${m.credits_earned}</strong></td>
-      <td><span class="chip ${ok ? 'chip-pass' : 'chip-fail'}">${ok ? 'Pass' : 'Fail'}</span></td>
       <td class="actions-cell">
-        <button class="btn btn-edit btn-sm" onclick='editMarks(${JSON.stringify(m).replace(/'/g,"&#39;")})'>✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteMarks(${m.roll_no},'${m.subject_id}',${m.semester})">🗑️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteMarkEntry(${m.mark_id})">🗑️</button>
       </td>
     </tr>`;
   }).join('');
@@ -303,7 +473,7 @@ async function deleteStudent(rollNo) {
 }
 
 async function deleteSubject(subjectId) {
-  if (!confirm('Delete subject ' + subjectId + '? This will also delete all marks for this subject.')) return;
+  if (!confirm('Delete subject ' + subjectId + '? This will also delete all components and marks for this subject.')) return;
   try {
     const res = await fetch(API + '/subject/' + subjectId, { method: 'DELETE' });
     const data = await res.json();
@@ -313,13 +483,67 @@ async function deleteSubject(subjectId) {
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
 
+async function deleteComponent(componentId) {
+  if (!confirm('Delete component ' + componentId + '? This will also delete all marks for this component.')) return;
+  try {
+    const res = await fetch(API + '/component/' + componentId, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    showDataAlert(data.message, 'success');
+    fetchAllData();
+  } catch (err) { showDataAlert(err.message, 'error'); }
+}
+
 async function deleteMarks(rollNo, subjectId, semester) {
-  if (!confirm('Delete marks for Roll ' + rollNo + ', Subject ' + subjectId + ', Sem ' + semester + '?')) return;
+  if (!confirm('Delete all marks for Roll ' + rollNo + ', Subject ' + subjectId + ', Sem ' + semester + '?')) return;
   try {
     const res = await fetch(API + '/marks/' + rollNo + '/' + subjectId + '/' + semester, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
     showDataAlert(data.message, 'success');
+    fetchAllData();
+  } catch (err) { showDataAlert(err.message, 'error'); }
+}
+
+async function deleteMarkEntry(markId) {
+  if (!confirm('Delete this mark entry?')) return;
+  try {
+    // Use a simple fetch to delete by mark_id — we need a small workaround
+    // since the backend doesn't have a single-mark delete endpoint by mark_id directly,
+    // we'll call the general marks endpoint
+    const res = await fetch(API + '/marks', { method: 'GET' });
+    const allMarks = await res.json();
+    const mark = allMarks.find(m => m.mark_id === markId);
+    if (!mark) { showDataAlert('Mark entry not found', 'error'); return; }
+
+    // Delete all marks for this student+subject+semester, then re-add the others
+    const siblingMarks = allMarks.filter(m =>
+      m.roll_no === mark.roll_no &&
+      m.subject_id === mark.subject_id &&
+      m.semester === mark.semester &&
+      m.mark_id !== markId
+    );
+
+    // Delete all for this subject
+    const delRes = await fetch(API + '/marks/' + mark.roll_no + '/' + mark.subject_id + '/' + mark.semester, { method: 'DELETE' });
+    if (!delRes.ok) { const d = await delRes.json(); throw new Error(d.error); }
+
+    // Re-add siblings if any
+    if (siblingMarks.length > 0) {
+      const reAddRes = await fetch(API + '/marks', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roll_no: mark.roll_no,
+          subject_id: mark.subject_id,
+          semester: mark.semester,
+          credits_earned: siblingMarks[0].credits_earned,
+          marks: siblingMarks.map(m => ({ component_id: m.component_id, obtained_marks: m.obtained_marks })),
+        }),
+      });
+      if (!reAddRes.ok) { const d = await reAddRes.json(); throw new Error(d.error); }
+    }
+
+    showDataAlert('Mark entry deleted & Prolog KB updated.', 'success');
     fetchAllData();
   } catch (err) { showDataAlert(err.message, 'error'); }
 }
@@ -425,23 +649,22 @@ function editSubject(s) {
   });
 }
 
-/* ─── Edit Marks ─── */
-function editMarks(m) {
-  openEditModal('Edit Marks — Roll ' + m.roll_no + ' / ' + m.subject_id + ' / Sem ' + m.semester, [
-    { key: 'roll_no', label: 'Roll Number', type: 'number', value: m.roll_no, disabled: true },
-    { key: 'subject_id', label: 'Subject ID', value: m.subject_id, disabled: true },
-    { key: 'semester', label: 'Semester', type: 'number', value: m.semester, disabled: true },
-    { key: 'cie_marks', label: 'CIE Marks (max 40)', type: 'number', value: m.cie_marks, min: 0, max: 40 },
-    { key: 'ese_marks', label: 'ESE Marks (max 60)', type: 'number', value: m.ese_marks, min: 0, max: 60 },
-    { key: 'credits_earned', label: 'Credits Earned', type: 'number', value: m.credits_earned, min: 0, max: 6 },
+/* ─── Edit Component ─── */
+function editComponent(c) {
+  openEditModal('Edit Component — ID ' + c.component_id, [
+    { key: 'component_id', label: 'Component ID', type: 'number', value: c.component_id, disabled: true },
+    { key: 'subject_id', label: 'Subject', value: c.subject_id + ' — ' + (c.subject_name || ''), disabled: true },
+    { key: 'component_name', label: 'Component Name', value: c.component_name },
+    { key: 'max_marks', label: 'Max Marks', type: 'number', value: c.max_marks, min: 1 },
+    { key: 'passing_marks', label: 'Passing Marks', type: 'number', value: c.passing_marks || 0, min: 0 },
   ], async () => {
     try {
-      const res = await fetch(API + '/marks/' + m.roll_no + '/' + m.subject_id + '/' + m.semester, {
+      const res = await fetch(API + '/component/' + c.component_id, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          cie_marks: document.getElementById('edit-cie_marks').value,
-          ese_marks: document.getElementById('edit-ese_marks').value,
-          credits_earned: document.getElementById('edit-credits_earned').value,
+          component_name: document.getElementById('edit-component_name').value,
+          max_marks: document.getElementById('edit-max_marks').value,
+          passing_marks: document.getElementById('edit-passing_marks').value,
         }),
       });
       const data = await res.json();
@@ -685,7 +908,7 @@ function statusBadgeHTML(val) {
   return '<span class="result-status-badge ' + cls + '">' + emoji + ' ' + val + '</span>';
 }
 
-/* ─── Reasoning Builder ─── */
+/* ─── Reasoning Builder (Component-Based) ─── */
 function buildReasoning(queryType) {
   const a = prologAnalysis;
   if (!a || a.length === 0) return '';
@@ -694,10 +917,13 @@ function buildReasoning(queryType) {
     case 'sgpa': {
       const totalW = a.reduce((s, x) => s + x.weighted_gp, 0);
       const totalCr = a.reduce((s, x) => s + x.credits, 0);
-      let rows = a.map(x => '<tr><td>' + x.subject_name + '</td><td>' + x.total_marks + '</td><td>' + x.grade_points + '</td><td>' + x.credits + '</td><td><strong>' + x.weighted_gp + '</strong></td></tr>').join('');
-      rows += '<tr class="reasoning-total-row"><td colspan="3"><strong>Total</strong></td><td><strong>' + totalCr + '</strong></td><td><strong>' + totalW + '</strong></td></tr>';
+      let rows = a.map(x => {
+        const compStr = (x.components || []).map(c => c.component_name + ':' + c.obtained_marks + '/' + c.max_marks).join(', ');
+        return '<tr><td>' + x.subject_name + '</td><td style="font-size:0.72rem;">' + compStr + '</td><td>' + x.total_marks + '/' + x.max_marks + '</td><td>' + x.percentage + '%</td><td>' + x.grade_points + '</td><td>' + x.credits + '</td><td><strong>' + x.weighted_gp + '</strong></td></tr>';
+      }).join('');
+      rows += '<tr class="reasoning-total-row"><td colspan="5"><strong>Total</strong></td><td><strong>' + totalCr + '</strong></td><td><strong>' + totalW + '</strong></td></tr>';
       return '<div class="reasoning-box"><div class="reasoning-title">📐 Calculation Breakdown</div>' +
-        '<table class="reasoning-table"><thead><tr><th>Subject</th><th>Total</th><th>GP</th><th>Cr</th><th>GP×Cr</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        '<table class="reasoning-table"><thead><tr><th>Subject</th><th>Components</th><th>Total</th><th>%</th><th>GP</th><th>Cr</th><th>GP×Cr</th></tr></thead><tbody>' + rows + '</tbody></table>' +
         '<div class="reasoning-formula">SGPA = ' + totalW + ' ÷ ' + totalCr + ' = <strong>' + (totalCr > 0 ? (totalW / totalCr).toFixed(2) : '—') + '</strong></div></div>';
     }
     case 'cgpa':
@@ -716,9 +942,13 @@ function buildReasoning(queryType) {
       const failedNoGrace = a.filter(x => !x.passed && !x.grace_eligible);
       let html = '<div class="reasoning-box"><div class="reasoning-title">📐 Grace Marks Analysis</div>';
       if (graceSubjects.length) {
-        graceSubjects.forEach(x => { html += '<div class="reasoning-text">🕊️ <strong>' + x.subject_name + '</strong>: Needed ' + x.grace_needed + ' grace mark(s) to pass.</div>'; });
+        graceSubjects.forEach(x => {
+          html += '<div class="reasoning-text">🕊️ <strong>' + x.subject_name + '</strong>: Needed ' + x.grace_needed + ' grace mark(s) to pass.';
+          if (x.reasons.length) html += ' (' + x.reasons.join('; ') + ')';
+          html += '</div>';
+        });
       } else if (failedNoGrace.length) {
-        html += '<div class="reasoning-text">Grace not applicable — failed subjects need more than 6 marks to pass.</div>';
+        html += '<div class="reasoning-text">Grace not applicable — failed components need more than 6 marks total to pass.</div>';
       } else {
         html += '<div class="reasoning-text">All subjects passed — no grace marks needed.</div>';
       }
@@ -751,7 +981,12 @@ function buildReasoning(queryType) {
         html += '<div class="reasoning-text">✅ No backlogs — all subjects passed.</div>';
       } else {
         failed.forEach(x => {
-          html += '<div class="reasoning-text" style="color:#dc2626">❌ <strong>' + x.subject_name + ' (' + x.subject_id + ')</strong>: CIE = ' + x.cie_marks + '/40' + (x.cie_marks < 18 ? ' ⚠ (need ≥18)' : ' ✓') + ', ESE = ' + x.ese_marks + '/60' + (x.ese_marks < 24 ? ' ⚠ (need ≥24)' : ' ✓') + '</div>';
+          const compDetails = (x.components || []).map(c => {
+            const pass = c.passing_marks > 0;
+            const ok = !pass || c.obtained_marks >= c.passing_marks;
+            return c.component_name + ' = ' + c.obtained_marks + '/' + c.max_marks + (pass ? (ok ? ' ✓' : ' ⚠ (need ≥' + c.passing_marks + ')') : '');
+          }).join(', ');
+          html += '<div class="reasoning-text" style="color:#dc2626">❌ <strong>' + x.subject_name + ' (' + x.subject_id + ')</strong>: ' + compDetails + '</div>';
         });
       }
       return html + '</div>';

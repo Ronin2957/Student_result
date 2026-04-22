@@ -1,9 +1,4 @@
-"""
-app.py — Flask API server
-Scholastic Result Analysis — Demo Project (Both Methods)
-Start with: python app.py
-Runs on http://localhost:5000
-"""
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import db

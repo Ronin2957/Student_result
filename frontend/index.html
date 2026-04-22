@@ -3,325 +3,268 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GradeMatrix — Student Result Analysis System</title>
-  <meta name="description" content="Student Result Analysis System with Prolog inference engine">
+  <title>Result Analysis - Both Methods</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<!-- ═══ NAVBAR ═══ -->
-<nav class="navbar">
-  <a class="navbar-brand" href="#">
-    <div class="navbar-logo">G</div>
-    <span class="navbar-name">GradeMatrix</span>
-  </a>
-  <div class="navbar-links">
-    <button class="navbar-link" onclick="document.getElementById('data-input-section').scrollIntoView({behavior:'smooth'})">📋 Data Input</button>
-    <button class="navbar-link" onclick="document.getElementById('prolog-section').scrollIntoView({behavior:'smooth'})">🧠 Prolog</button>
-    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle Dark / Light Mode">
-      <span class="theme-icon" id="theme-icon">🌙</span>
-    </button>
-  </div>
-</nav>
+<!-- Header -->
+<div class="header">
+  <h1>Scholastic Result Analysis — Both Methods (SQL + Prolog)</h1>
+</div>
 
-<!-- ═══ MAIN ═══ -->
-<main class="main-container">
+<!-- DATA INPUT CARD -->
+<div class="card">
+  <div class="card-title">Data Input</div>
+  <div class="card-subtitle">Add students, subjects, components and marks (stored in both MySQL and Prolog KB)</div>
 
-  <!-- ════════════════════════════════════════════════════ -->
-  <!-- DATA INPUT CARD -->
-  <!-- ════════════════════════════════════════════════════ -->
-  <div id="data-input-section" class="card">
-    <div class="card-header">
-      <div class="card-icon purple">📋</div>
-      <div>
-        <div class="card-title">Data Input</div>
-        <div class="card-subtitle">Add students, subjects, components &amp; marks to the database</div>
-      </div>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs">
-      <button class="tab-btn active" id="tab-student" onclick="switchTab('student')">👤 Student</button>
-      <button class="tab-btn" id="tab-subject" onclick="switchTab('subject')">📚 Subject</button>
-      <button class="tab-btn" id="tab-component" onclick="switchTab('component')">🧩 Component</button>
-      <button class="tab-btn" id="tab-marks" onclick="switchTab('marks')">📝 Marks</button>
-    </div>
-
-    <!-- Alert -->
-    <div id="data-alert" class="hidden"></div>
-
-    <!-- Student Form -->
-    <form id="form-student" onsubmit="submitStudent(event); return false;">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="s-roll">Roll Number</label>
-          <input id="s-roll" type="number" placeholder="e.g. 101" required>
-        </div>
-        <div class="form-group">
-          <label for="s-name">Full Name</label>
-          <input id="s-name" type="text" placeholder="e.g. Riya Sharma" required>
-        </div>
-        <div class="form-group">
-          <label for="s-seat">Seat Number</label>
-          <input id="s-seat" type="text" placeholder="e.g. A-24" required>
-        </div>
-        <div class="form-group">
-          <label for="s-cat">Category</label>
-          <select id="s-cat">
-            <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="s-year">Year</label>
-          <select id="s-year" required>
-            <option value="">Select Year</option>
-            <option value="1">Year 1</option><option value="2">Year 2</option><option value="3">Year 3</option><option value="4">Year 4</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="s-sem">Semester</label>
-          <select id="s-sem" required>
-            <option value="">Select Semester</option>
-            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
-            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
-          </select>
-        </div>
-      </div>
-      <div><button type="submit" class="btn btn-primary" id="submit-student">➕ Add Student</button></div>
-    </form>
-
-    <!-- Subject Form -->
-    <form id="form-subject" class="hidden" onsubmit="submitSubject(event); return false;">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="sub-id">Subject ID</label>
-          <input id="sub-id" type="text" placeholder="e.g. CS301" required>
-        </div>
-        <div class="form-group">
-          <label for="sub-name">Subject Name</label>
-          <input id="sub-name" type="text" placeholder="e.g. Data Structures" required>
-        </div>
-        <div class="form-group">
-          <label for="sub-credits">Credits</label>
-          <input id="sub-credits" type="number" min="1" max="6" placeholder="e.g. 4" required>
-        </div>
-        <div class="form-group">
-          <label for="sub-sem">Semester</label>
-          <select id="sub-sem" required>
-            <option value="">Select Semester</option>
-            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
-            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
-          </select>
-        </div>
-      </div>
-      <div><button type="submit" class="btn btn-primary" id="submit-subject">➕ Add Subject</button></div>
-    </form>
-
-    <!-- Component Form -->
-    <form id="form-component" class="hidden" onsubmit="submitComponent(event); return false;">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="comp-subid">Subject</label>
-          <select id="comp-subid" required>
-            <option value="">— Select subject —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="comp-name">Component Name</label>
-          <input id="comp-name" type="text" placeholder="e.g. I1, E1, T1, O1" required>
-        </div>
-        <div class="form-group">
-          <label for="comp-max">Max Marks</label>
-          <input id="comp-max" type="number" min="1" placeholder="e.g. 40" required>
-        </div>
-        <div class="form-group">
-          <label for="comp-pass">Passing Marks</label>
-          <input id="comp-pass" type="number" min="0" placeholder="e.g. 18 (0 = none)" value="0">
-        </div>
-      </div>
-      <div><button type="submit" class="btn btn-primary" id="submit-component">➕ Add Component</button></div>
-    </form>
-
-    <!-- Marks Form -->
-    <form id="form-marks" class="hidden" onsubmit="submitMarks(event); return false;">
-      <div class="form-grid">
-        <div class="form-group">
-          <label for="m-roll">Roll Number</label>
-          <input id="m-roll" type="number" placeholder="e.g. 101" required>
-        </div>
-        <div class="form-group">
-          <label for="m-sem">Semester</label>
-          <select id="m-sem" required onchange="loadSemesterSubjects()">
-            <option value="">Select Semester</option>
-            <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
-            <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="m-subid">Subject</label>
-          <select id="m-subid" required disabled onchange="loadSubjectComponents()">
-            <option value="">— Select semester first —</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="m-credits">Credits Earned</label>
-          <input id="m-credits" type="number" min="0" max="6" placeholder="e.g. 3" required>
-        </div>
-      </div>
-
-      <!-- Dynamic component inputs container -->
-      <div id="marksContainer"></div>
-
-      <!-- Live Total -->
-      <div id="live-total-wrapper" class="hidden" style="margin-bottom:0.85rem;">
-        <label>Live Total</label>
-        <div id="live-total" style="padding:8px 10px;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:6px;font-weight:700;color:var(--text-accent, #6366f1);font-size:0.9rem;">0 / 0</div>
-      </div>
-
-      <div><button type="submit" class="btn btn-primary" id="submit-marks">➕ Add Marks</button></div>
-    </form>
-
-    <!-- Show Data -->
-    <div style="margin-top:1.5rem;border-top:1px solid var(--border-main, #dde1e8);padding-top:1rem;">
-      <button class="btn btn-secondary" id="show-data-btn" onclick="fetchAllData()">👁 Show Data</button>
-    </div>
-
-    <!-- Data Tables -->
-    <div id="data-tables" class="hidden">
-      <!-- Students Table -->
-      <div class="table-section">
-        <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot purple"></span> Students</div>
-          <span id="students-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
-        </div>
-        <div class="table-wrapper"><table><thead><tr>
-          <th>Roll No</th><th>Name</th><th>Seat No</th><th>Category</th><th>Year</th><th>Semester</th><th>Actions</th>
-        </tr></thead><tbody id="students-tbody"><tr><td colspan="7" class="empty-table">No students added yet.</td></tr></tbody></table></div>
-      </div>
-
-      <!-- Subjects Table -->
-      <div class="table-section">
-        <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot cyan"></span> Subjects</div>
-          <span id="subjects-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
-        </div>
-        <div class="table-wrapper"><table><thead><tr>
-          <th>Subject ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th><th>Components</th><th>Actions</th>
-        </tr></thead><tbody id="subjects-tbody"><tr><td colspan="6" class="empty-table">No subjects added yet.</td></tr></tbody></table></div>
-      </div>
-
-      <!-- Components Table -->
-      <div class="table-section">
-        <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot green"></span> Components</div>
-          <span id="components-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
-        </div>
-        <div class="table-wrapper"><table><thead><tr>
-          <th>ID</th><th>Subject</th><th>Component</th><th>Max Marks</th><th>Pass Marks</th><th>Actions</th>
-        </tr></thead><tbody id="components-tbody"><tr><td colspan="6" class="empty-table">No components added yet.</td></tr></tbody></table></div>
-      </div>
-
-      <!-- Marks Table -->
-      <div class="table-section">
-        <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot amber"></span> Marks</div>
-          <span id="marks-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
-        </div>
-        <div class="table-wrapper"><table><thead><tr>
-          <th>Roll</th><th>Student</th><th>Subject</th><th>Component</th><th>Sem</th><th>Obtained</th><th>Max</th><th>Credits</th><th>Actions</th>
-        </tr></thead><tbody id="marks-tbody"><tr><td colspan="9" class="empty-table">No marks added yet.</td></tr></tbody></table></div>
-      </div>
-
-      <!-- Results Table -->
-      <div class="table-section" id="results-section">
-        <div class="table-section-header">
-          <div class="table-section-title"><span class="table-dot amber"></span> Results (via Prolog)</div>
-          <span id="results-count" style="font-size:0.75rem;color:#94a3b8;">0 records</span>
-        </div>
-        <div class="table-wrapper"><table><thead><tr>
-          <th>Roll</th><th>Student</th><th>Sem</th><th>SGPA</th><th>Credits</th><th>Grace</th><th>Backlogs</th><th>Status</th>
-        </tr></thead><tbody id="results-tbody"><tr><td colspan="8" class="empty-table">No results computed yet.</td></tr></tbody></table></div>
-      </div>
-    </div>
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-student" onclick="switchTab('student')">Student</button>
+    <button class="tab-btn" id="tab-subject" onclick="switchTab('subject')">Subject</button>
+    <button class="tab-btn" id="tab-component" onclick="switchTab('component')">Component</button>
+    <button class="tab-btn" id="tab-marks" onclick="switchTab('marks')">Marks</button>
   </div>
 
-  <!-- ════════════════════════════════════════════════════ -->
-  <!-- PROLOG INFERENCE ENGINE CARD -->
-  <!-- ════════════════════════════════════════════════════ -->
-  <div id="prolog-section" class="card">
-    <div class="card-header">
-      <div class="card-icon cyan">🧠</div>
-      <div>
-        <div class="card-title">Prolog Inference Engine</div>
-        <div class="card-subtitle">Run knowledge-base queries on student data</div>
-      </div>
-    </div>
+  <!-- Alert -->
+  <div id="data-alert" class="hidden"></div>
 
-    <!-- Student + Semester selector -->
-    <div class="selector-row">
+  <!-- Student Form -->
+  <form id="form-student" onsubmit="submitStudent(event); return false;">
+    <div class="form-grid">
       <div class="form-group">
-        <label for="p-student">Select Student</label>
-        <select id="p-student" onchange="onPrologStudentChange()">
-          <option value="">— Choose a student —</option>
+        <label for="s-roll">Roll Number</label>
+        <input id="s-roll" type="number" placeholder="e.g. 101" required>
+      </div>
+      <div class="form-group">
+        <label for="s-name">Full Name</label>
+        <input id="s-name" type="text" placeholder="e.g. Riya Sharma" required>
+      </div>
+      <div class="form-group">
+        <label for="s-seat">Seat Number</label>
+        <input id="s-seat" type="text" placeholder="e.g. A-24" required>
+      </div>
+      <div class="form-group">
+        <label for="s-cat">Category</label>
+        <select id="s-cat">
+          <option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>EWS</option>
         </select>
       </div>
       <div class="form-group">
-        <label for="p-sem">Select Semester</label>
-        <select id="p-sem" onchange="onPrologSemChange()">
-          <option value="">— Choose semester —</option>
-          <option value="1">Semester 1</option><option value="2">Semester 2</option><option value="3">Semester 3</option><option value="4">Semester 4</option>
-          <option value="5">Semester 5</option><option value="6">Semester 6</option><option value="7">Semester 7</option><option value="8">Semester 8</option>
+        <label for="s-year">Year</label>
+        <select id="s-year" required>
+          <option value="">Select Year</option>
+          <option value="1">Year 1</option><option value="2">Year 2</option>
+          <option value="3">Year 3</option><option value="4">Year 4</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="s-sem">Semester</label>
+        <select id="s-sem" required>
+          <option value="">Select Semester</option>
+          <option value="1">Sem 1</option><option value="2">Sem 2</option>
+          <option value="3">Sem 3</option><option value="4">Sem 4</option>
+          <option value="5">Sem 5</option><option value="6">Sem 6</option>
+          <option value="7">Sem 7</option><option value="8">Sem 8</option>
         </select>
       </div>
     </div>
+    <button type="submit" class="btn btn-primary">Add Student</button>
+  </form>
 
-    <!-- Student info chip -->
-    <div id="prolog-student-info" class="student-info-chip hidden"></div>
-
-    <!-- Error -->
-    <div id="prolog-error" class="alert alert-error hidden"></div>
-
-    <div class="selector-divider"></div>
-
-    <div style="margin-bottom:0.5rem;">
-      <div class="section-label">Prolog Queries — Click to Run</div>
-    </div>
-
-    <!-- Query Buttons -->
-    <div class="query-grid" id="query-grid"></div>
-
-    <!-- Results Panel -->
-    <div id="prolog-results" class="hidden" style="margin-top:1.5rem;">
-      <div class="section-label" style="margin-bottom:0.75rem;" id="prolog-results-title">Query Results</div>
-      <div class="results-list" id="prolog-results-list"></div>
-      <div style="margin-top:0.75rem;font-size:0.75rem;color:#94a3b8;">
-        Results stored in database. Refresh "Show Data" in the Data Input card to see updated Result table.
+  <!-- Subject Form -->
+  <form id="form-subject" class="hidden" onsubmit="submitSubject(event); return false;">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="sub-id">Subject ID</label>
+        <input id="sub-id" type="text" placeholder="e.g. CS301" required>
+      </div>
+      <div class="form-group">
+        <label for="sub-name">Subject Name</label>
+        <input id="sub-name" type="text" placeholder="e.g. Data Structures" required>
+      </div>
+      <div class="form-group">
+        <label for="sub-credits">Credits</label>
+        <input id="sub-credits" type="number" min="1" max="6" placeholder="e.g. 4" required>
+      </div>
+      <div class="form-group">
+        <label for="sub-sem">Semester</label>
+        <select id="sub-sem" required>
+          <option value="">Select Semester</option>
+          <option value="1">Sem 1</option><option value="2">Sem 2</option>
+          <option value="3">Sem 3</option><option value="4">Sem 4</option>
+          <option value="5">Sem 5</option><option value="6">Sem 6</option>
+          <option value="7">Sem 7</option><option value="8">Sem 8</option>
+        </select>
       </div>
     </div>
+    <button type="submit" class="btn btn-primary">Add Subject</button>
+  </form>
 
-    <!-- Empty states -->
-    <div id="prolog-empty-selection" style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:0.85rem;">
-      <div style="font-size:2rem;margin-bottom:0.5rem;">☝️</div>
-      Select a student and semester to enable Prolog queries.
+  <!-- Component Form -->
+  <form id="form-component" class="hidden" onsubmit="submitComponent(event); return false;">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="comp-subid">Subject</label>
+        <select id="comp-subid" required>
+          <option value="">-- Select subject --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="comp-name">Component Name</label>
+        <input id="comp-name" type="text" placeholder="e.g. I1, E1, T1" required>
+      </div>
+      <div class="form-group">
+        <label for="comp-max">Max Marks</label>
+        <input id="comp-max" type="number" min="1" placeholder="e.g. 40" required>
+      </div>
+      <div class="form-group">
+        <label for="comp-pass">Passing Marks</label>
+        <input id="comp-pass" type="number" min="0" placeholder="e.g. 16" value="0">
+      </div>
     </div>
-    <div id="prolog-empty-results" class="hidden" style="text-align:center;padding:1.5rem;color:#94a3b8;font-size:0.85rem;">
-      <div style="font-size:2rem;margin-bottom:0.5rem;">🧠</div>
-      Select a query above to run Prolog inference on the selected student's data.
+    <button type="submit" class="btn btn-primary">Add Component</button>
+  </form>
+
+  <!-- Marks Form -->
+  <form id="form-marks" class="hidden" onsubmit="submitMarks(event); return false;">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="m-roll">Roll Number</label>
+        <input id="m-roll" type="number" placeholder="e.g. 101" required>
+      </div>
+      <div class="form-group">
+        <label for="m-sem">Semester</label>
+        <select id="m-sem" required onchange="loadSemesterSubjects()">
+          <option value="">Select Semester</option>
+          <option value="1">Sem 1</option><option value="2">Sem 2</option>
+          <option value="3">Sem 3</option><option value="4">Sem 4</option>
+          <option value="5">Sem 5</option><option value="6">Sem 6</option>
+          <option value="7">Sem 7</option><option value="8">Sem 8</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="m-subid">Subject</label>
+        <select id="m-subid" required disabled onchange="loadSubjectComponents()">
+          <option value="">-- Select semester first --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="m-credits">Credits Earned</label>
+        <input id="m-credits" type="number" min="0" max="6" placeholder="e.g. 3" required>
+      </div>
+    </div>
+    <div id="marksContainer"></div>
+    <button type="submit" class="btn btn-primary">Add Marks</button>
+  </form>
+
+  <!-- Show Data Button -->
+  <div style="margin-top:15px; border-top:1px solid #ddd; padding-top:10px;">
+    <button class="btn btn-secondary" id="show-data-btn" onclick="fetchAllData()">Show Data</button>
+  </div>
+
+  <!-- Data Tables -->
+  <div id="data-tables" class="hidden">
+    <div class="table-section">
+      <div class="table-section-title">Students</div>
+      <table><thead><tr>
+        <th>Roll No</th><th>Name</th><th>Seat No</th><th>Category</th><th>Year</th><th>Semester</th>
+      </tr></thead><tbody id="students-tbody"><tr><td colspan="6" class="empty-table">No students yet.</td></tr></tbody></table>
+    </div>
+    <div class="table-section">
+      <div class="table-section-title">Subjects</div>
+      <table><thead><tr>
+        <th>ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th>
+      </tr></thead><tbody id="subjects-tbody"><tr><td colspan="4" class="empty-table">No subjects yet.</td></tr></tbody></table>
+    </div>
+    <div class="table-section">
+      <div class="table-section-title">Components</div>
+      <table><thead><tr>
+        <th>ID</th><th>Subject</th><th>Component</th><th>Max Marks</th><th>Pass Marks</th>
+      </tr></thead><tbody id="components-tbody"><tr><td colspan="5" class="empty-table">No components yet.</td></tr></tbody></table>
+    </div>
+    <div class="table-section">
+      <div class="table-section-title">Marks</div>
+      <table><thead><tr>
+        <th>Roll</th><th>Student</th><th>Subject</th><th>Component</th><th>Sem</th><th>Obtained</th><th>Max</th><th>Credits</th>
+      </tr></thead><tbody id="marks-tbody"><tr><td colspan="8" class="empty-table">No marks yet.</td></tr></tbody></table>
     </div>
   </div>
-</main>
+</div>
 
-<!-- ═══ EDIT MODAL ═══ -->
-<div id="edit-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <div class="modal-title" id="edit-modal-title">Edit Record</div>
-    <form id="edit-modal-form" onsubmit="submitEditModal(event)">
-      <div id="edit-modal-fields" class="form-grid"></div>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
-        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
-      </div>
-    </form>
+<!-- SQL ANALYSIS CARD -->
+<div class="card">
+  <div class="card-title">SQL Analysis <span class="method-label method-sql">SQL</span></div>
+  <div class="card-subtitle">Run SQL queries on student data (MySQL database)</div>
+
+  <div class="selector-row">
+    <div class="form-group">
+      <label for="sq-student">Select Student</label>
+      <select id="sq-student">
+        <option value="">-- Choose a student --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="sq-sem">Select Semester</label>
+      <select id="sq-sem">
+        <option value="">-- Choose semester --</option>
+        <option value="1">Sem 1</option><option value="2">Sem 2</option>
+        <option value="3">Sem 3</option><option value="4">Sem 4</option>
+        <option value="5">Sem 5</option><option value="6">Sem 6</option>
+        <option value="7">Sem 7</option><option value="8">Sem 8</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="query-grid" id="sql-query-grid"></div>
+
+  <div id="sql-result-panel" class="result-panel hidden">
+    <div class="result-label" id="sql-result-label">Result</div>
+    <div class="result-value" id="sql-result-value">—</div>
+    <div class="result-time" id="sql-result-time"></div>
+  </div>
+
+  <div id="sql-query-empty" style="text-align:center; padding:20px; color:#999; font-size:0.85rem;">
+    Select a student and semester, then click a query button.
+  </div>
+</div>
+
+<!-- PROLOG ANALYSIS CARD -->
+<div class="card">
+  <div class="card-title">Prolog Analysis <span class="method-label method-prolog">Prolog</span></div>
+  <div class="card-subtitle">Run Prolog rules on student data (SWI-Prolog knowledge base)</div>
+
+  <div class="selector-row">
+    <div class="form-group">
+      <label for="pq-student">Select Student</label>
+      <select id="pq-student">
+        <option value="">-- Choose a student --</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="pq-sem">Select Semester</label>
+      <select id="pq-sem">
+        <option value="">-- Choose semester --</option>
+        <option value="1">Sem 1</option><option value="2">Sem 2</option>
+        <option value="3">Sem 3</option><option value="4">Sem 4</option>
+        <option value="5">Sem 5</option><option value="6">Sem 6</option>
+        <option value="7">Sem 7</option><option value="8">Sem 8</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="query-grid" id="prolog-query-grid"></div>
+
+  <div id="prolog-result-panel" class="result-panel hidden">
+    <div class="result-label" id="prolog-result-label">Result</div>
+    <div class="result-value" id="prolog-result-value">—</div>
+    <div class="result-time" id="prolog-result-time"></div>
+  </div>
+
+  <div id="prolog-query-empty" style="text-align:center; padding:20px; color:#999; font-size:0.85rem;">
+    Select a student and semester, then click a query button.
   </div>
 </div>
 

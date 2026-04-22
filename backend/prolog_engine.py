@@ -1,11 +1,4 @@
-"""
-prolog_engine.py — Prolog fact management & query runner
-Scholastic Result Analysis — Demo Project (Both Methods)
 
-This module:
-  1. Reads/writes Prolog facts to knowledge_base.pl (acts as our database)
-  2. Runs SWI-Prolog queries via subprocess and parses results
-"""
 import os
 import re
 import subprocess

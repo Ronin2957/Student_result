@@ -1,7 +1,3 @@
--- ============================================================
--- SCHOLASTIC RESULT ANALYSIS — DEMO PROJECT (Both Methods)
--- Run this in phpMyAdmin or MySQL CLI (XAMPP)
--- ============================================================
 
 CREATE DATABASE IF NOT EXISTS paradigm_result
   CHARACTER SET utf8mb4
@@ -54,9 +50,7 @@ CREATE TABLE IF NOT EXISTS Marks (
     FOREIGN KEY (component_id) REFERENCES Component(component_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
--- ============================================================
--- SAMPLE DATA (pre-loaded for testing)
--- ============================================================
+-- SAMPLE DATA
 
 -- Students
 INSERT INTO Student (roll_no, name, seat_no, category, year, semester) VALUES

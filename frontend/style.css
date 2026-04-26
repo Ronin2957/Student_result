@@ -102,6 +102,30 @@ input:focus, select:focus {
 .btn-secondary { background: #e0e0e0; color: #333; border: 1px solid #ccc; }
 .btn-secondary:hover:not(:disabled) { background: #d0d0d0; }
 
+/* ─── Action Buttons (Edit/Delete in tables) ─── */
+.action-cell {
+  white-space: nowrap;
+}
+.btn-action {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-right: 4px;
+}
+.btn-edit {
+  background: #ffc107;
+  color: #333;
+}
+.btn-edit:hover { background: #e0a800; }
+.btn-delete {
+  background: #dc3545;
+  color: white;
+}
+.btn-delete:hover { background: #c82333; }
+
 /* ─── Alert ─── */
 .alert {
   padding: 10px;
@@ -151,7 +175,7 @@ tr:hover { background: #f9f9f9; }
 /* ─── Query Buttons ─── */
 .query-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px;
   margin-bottom: 15px;
 }
@@ -211,6 +235,49 @@ tr:hover { background: #f9f9f9; }
 }
 .method-sql { background: #e8f4fd; color: #1565c0; }
 .method-prolog { background: #fce4ec; color: #c62828; }
+
+/* ─── Modal ─── */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #999;
+}
+.modal-close:hover { color: #333; }
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
 
 /* ─── Responsive ─── */
 @media (max-width: 768px) {

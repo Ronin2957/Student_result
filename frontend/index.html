@@ -160,35 +160,52 @@
 
   <!-- Show Data Button -->
   <div style="margin-top:15px; border-top:1px solid #ddd; padding-top:10px;">
-    <button class="btn btn-secondary" id="show-data-btn" onclick="fetchAllData()">Show Data</button>
+    <button class="btn btn-secondary" id="show-data-btn" onclick="fetchTabData()">Show Data</button>
   </div>
 
   <!-- Data Tables -->
   <div id="data-tables" class="hidden">
-    <div class="table-section">
+    <div class="table-section" id="table-section-student">
       <div class="table-section-title">Students</div>
       <table><thead><tr>
-        <th>Roll No</th><th>Name</th><th>Seat No</th><th>Category</th><th>Year</th><th>Semester</th>
-      </tr></thead><tbody id="students-tbody"><tr><td colspan="6" class="empty-table">No students yet.</td></tr></tbody></table>
+        <th>Roll No</th><th>Name</th><th>Seat No</th><th>Category</th><th>Year</th><th>Semester</th><th>Actions</th>
+      </tr></thead><tbody id="students-tbody"><tr><td colspan="7" class="empty-table">No students yet.</td></tr></tbody></table>
     </div>
-    <div class="table-section">
+    <div class="table-section" id="table-section-subject">
       <div class="table-section-title">Subjects</div>
       <table><thead><tr>
-        <th>ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th>
-      </tr></thead><tbody id="subjects-tbody"><tr><td colspan="4" class="empty-table">No subjects yet.</td></tr></tbody></table>
+        <th>ID</th><th>Subject Name</th><th>Credits</th><th>Semester</th><th>Actions</th>
+      </tr></thead><tbody id="subjects-tbody"><tr><td colspan="5" class="empty-table">No subjects yet.</td></tr></tbody></table>
     </div>
-    <div class="table-section">
+    <div class="table-section" id="table-section-component">
       <div class="table-section-title">Components</div>
       <table><thead><tr>
-        <th>ID</th><th>Subject</th><th>Component</th><th>Max Marks</th><th>Pass Marks</th>
-      </tr></thead><tbody id="components-tbody"><tr><td colspan="5" class="empty-table">No components yet.</td></tr></tbody></table>
+        <th>ID</th><th>Subject</th><th>Component</th><th>Max Marks</th><th>Pass Marks</th><th>Actions</th>
+      </tr></thead><tbody id="components-tbody"><tr><td colspan="6" class="empty-table">No components yet.</td></tr></tbody></table>
     </div>
-    <div class="table-section">
+    <div class="table-section" id="table-section-marks">
       <div class="table-section-title">Marks</div>
       <table><thead><tr>
-        <th>Roll</th><th>Student</th><th>Subject</th><th>Component</th><th>Sem</th><th>Obtained</th><th>Max</th><th>Credits</th>
-      </tr></thead><tbody id="marks-tbody"><tr><td colspan="8" class="empty-table">No marks yet.</td></tr></tbody></table>
+        <th>Roll</th><th>Student</th><th>Subject</th><th>Component</th><th>Sem</th><th>Obtained</th><th>Max</th><th>Credits</th><th>Actions</th>
+      </tr></thead><tbody id="marks-tbody"><tr><td colspan="9" class="empty-table">No marks yet.</td></tr></tbody></table>
     </div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div id="edit-modal" class="modal-overlay hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <span class="modal-title" id="edit-modal-title">Edit Record</span>
+      <button class="modal-close" onclick="closeEditModal()">&times;</button>
+    </div>
+    <form id="edit-modal-form" onsubmit="submitEditModal(event); return false;">
+      <div id="edit-modal-fields" class="form-grid"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 

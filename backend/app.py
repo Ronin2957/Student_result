@@ -47,6 +47,33 @@ def get_students():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/student/<int:roll_no>", methods=["PUT"])
+def edit_student(roll_no):
+    data = request.get_json()
+    required = ["name", "seat_no", "category", "year", "semester"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_student(roll_no, data["name"], data["seat_no"],
+                          data["category"], int(data["year"]), int(data["semester"]))
+        # Re-add to Prolog KB (replaces existing fact)
+        prolog_engine.add_student(roll_no, data["name"], data["seat_no"],
+                                  data["category"], int(data["year"]), int(data["semester"]))
+        return jsonify({"message": "Student updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/student/<int:roll_no>", methods=["DELETE"])
+def remove_student(roll_no):
+    try:
+        db.delete_student(roll_no)
+        prolog_engine.delete_student(roll_no)
+        return jsonify({"message": "Student deleted."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 # SUBJECT endpoints
 
@@ -71,6 +98,30 @@ def get_subjects():
         if semester:
             return jsonify(db.get_subjects_by_semester(int(semester)))
         return jsonify(db.get_all_subjects())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/subject/<subject_id>", methods=["PUT"])
+def edit_subject(subject_id):
+    data = request.get_json()
+    required = ["subject_name", "credits", "semester"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_subject(subject_id, data["subject_name"], int(data["credits"]), int(data["semester"]))
+        prolog_engine.add_subject(subject_id, data["subject_name"], int(data["credits"]), int(data["semester"]))
+        return jsonify({"message": "Subject updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/subject/<subject_id>", methods=["DELETE"])
+def remove_subject(subject_id):
+    try:
+        db.delete_subject(subject_id)
+        prolog_engine.delete_subject(subject_id)
+        return jsonify({"message": "Subject deleted."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -106,6 +157,30 @@ def get_all_components():
 def get_components(subject_id):
     try:
         return jsonify(db.get_components_by_subject(subject_id))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/component/<int:component_id>", methods=["PUT"])
+def edit_component(component_id):
+    data = request.get_json()
+    required = ["component_name", "max_marks", "passing_marks"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_component(component_id, data["component_name"],
+                            int(data["max_marks"]), int(data["passing_marks"]))
+        # Prolog KB components are matched by subject_id + component_name so re-add
+        return jsonify({"message": "Component updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/component/<int:component_id>", methods=["DELETE"])
+def remove_component(component_id):
+    try:
+        db.delete_component(component_id)
+        return jsonify({"message": "Component deleted."})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -164,6 +239,28 @@ def get_marks():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/mark/<int:mark_id>", methods=["PUT"])
+def edit_mark(mark_id):
+    data = request.get_json()
+    required = ["obtained_marks", "credits_earned"]
+    if not all(k in data for k in required):
+        return jsonify({"error": f"Missing fields. Required: {required}"}), 400
+    try:
+        db.update_mark(mark_id, int(data["obtained_marks"]), int(data["credits_earned"]))
+        return jsonify({"message": "Mark updated."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/mark/<int:mark_id>", methods=["DELETE"])
+def remove_mark(mark_id):
+    try:
+        db.delete_mark(mark_id)
+        return jsonify({"message": "Mark deleted."})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 
 # ANALYSIS endpoints — SQL Queries
 
@@ -181,10 +278,12 @@ def run_sql_query():
 
     query_functions = {
         "sgpa": db.calculate_sgpa,
+        "cgpa": db.calculate_cgpa,
         "total_credits": db.get_total_credits,
         "backlogs": db.get_backlogs,
         "grace_marks": db.get_grace_marks,
         "result_status": db.get_result_status,
+        "next_year_eligibility": db.get_next_year_eligibility,
     }
 
     if query_type not in query_functions:

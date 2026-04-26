@@ -88,6 +88,36 @@ def add_marks(roll_no, subject_id, semester, component_name, max_marks, passing_
     _write_facts(facts.strip())
 
 
+# ─── Delete Facts ───────────────────────────────────────────
+
+def delete_student(roll_no):
+    """Remove all facts for a student (student fact + all their marks)."""
+    facts = _get_facts_section()
+    # Remove student fact
+    pattern_student = re.compile(r"student\(" + str(roll_no) + r",.*?\)\.\n?")
+    facts = pattern_student.sub("", facts)
+    # Remove all marks for this student
+    pattern_marks = re.compile(r"marks\(" + str(roll_no) + r",.*?\)\.\n?")
+    facts = pattern_marks.sub("", facts)
+    _write_facts(facts.strip())
+
+
+def delete_subject(subject_id):
+    """Remove all facts for a subject (subject, components, and related marks)."""
+    facts = _get_facts_section()
+    esc = re.escape(subject_id)
+    # Remove subject fact
+    pattern_sub = re.compile(r"subject\('" + esc + r"',.*?\)\.\n?")
+    facts = pattern_sub.sub("", facts)
+    # Remove components for this subject
+    pattern_comp = re.compile(r"component\('" + esc + r"',.*?\)\.\n?")
+    facts = pattern_comp.sub("", facts)
+    # Remove marks for this subject
+    pattern_marks = re.compile(r"marks\(\d+,\s*'" + esc + r"',.*?\)\.\n?")
+    facts = pattern_marks.sub("", facts)
+    _write_facts(facts.strip())
+
+
 # ─── Read Facts ─────────────────────────────────────────────
 
 def get_all_students():
@@ -150,16 +180,24 @@ def get_all_marks():
 
 QUERY_TEMPLATES = {
     "sgpa": "sgpa({roll_no}, {semester}, X), format('RESULT:~2f', [X]), nl, halt.",
+    "cgpa": "cgpa({roll_no}, {semester}, X), format('RESULT:~2f', [X]), nl, halt.",
     "total_credits": "total_credits({roll_no}, {semester}, X), format('RESULT:~w', [X]), nl, halt.",
     "backlogs": "number_of_backlogs({roll_no}, {semester}, X), format('RESULT:~w', [X]), nl, halt.",
     "grace_marks": "grace_used({roll_no}, {semester}, X), format('RESULT:~w', [X]), nl, halt.",
     "result_status": "result_status({roll_no}, {semester}, X), format('RESULT:~w', [X]), nl, halt.",
+    "next_year_eligibility": "next_year_eligible({roll_no}, {semester}, X), format('RESULT:~w', [X]), nl, halt.",
 }
 
 
 def run_prolog_query(query_type, roll_no, semester):
     if query_type not in QUERY_TEMPLATES:
         return {"value": None, "error": f"Unknown query type: {query_type}", "execution_time_ms": 0}
+
+    # For CGPA and next_year_eligibility, check even semester constraint
+    if query_type == "cgpa" and int(semester) % 2 != 0:
+        return {"value": None, "error": "CGPA is only available for even semesters", "execution_time_ms": 0}
+    if query_type == "next_year_eligibility" and int(semester) % 2 != 0:
+        return {"value": None, "error": "Next year eligibility is only checked at even semesters (end of year)", "execution_time_ms": 0}
 
     goal = QUERY_TEMPLATES[query_type].format(roll_no=roll_no, semester=semester)
     kb_path = KB_PATH.replace("\\", "/")

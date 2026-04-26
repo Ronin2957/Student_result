@@ -156,6 +156,14 @@ compute_wgp(RollNo, Semester, [SubId | Rest], WAcc, CAcc, WSum, CrSum) :-
     CAcc1 is CAcc + Cr,
     compute_wgp(RollNo, Semester, Rest, WAcc1, CAcc1, WSum, CrSum).
 
+% --- CGPA Calculation (average of odd + even semester SGPAs) ---
+cgpa(RollNo, EvenSemester, CGPA) :-
+    EvenSemester mod 2 =:= 0,
+    OddSemester is EvenSemester - 1,
+    sgpa(RollNo, OddSemester, SGPAOdd),
+    sgpa(RollNo, EvenSemester, SGPAEven),
+    CGPA is (SGPAOdd + SGPAEven) / 2.
+
 % --- Total Credits Earned ---
 total_credits(RollNo, Semester, TotalCredits) :-
     findall(SubId-Cr,
@@ -201,16 +209,63 @@ sum_grace_needed([PassMin - Obtained | Rest], Acc, Total) :-
     Acc1 is Acc + Needed,
     sum_grace_needed(Rest, Acc1, Total).
 
-% --- Result Status ---
+% --- Overall Percentage (for class determination) ---
+overall_percentage(RollNo, Semester, Pct) :-
+    findall(Obt, marks(RollNo, _, Semester, _, _, _, Obt, _), ObtList),
+    ObtList \= [],
+    findall(Max, marks(RollNo, _, Semester, _, Max, _, _, _), MaxList),
+    sumlist(ObtList, TotalObt),
+    sumlist(MaxList, TotalMax),
+    TotalMax > 0,
+    Pct is (TotalObt / TotalMax) * 100.
+
+% --- Class Label based on percentage (NEP-2020) ---
+class_label(Pct, 'First Class with Distinction') :- Pct >= 75, !.
+class_label(Pct, 'First Class') :- Pct >= 60, !.
+class_label(Pct, 'Second Class') :- Pct >= 50, !.
+class_label(Pct, 'Pass Class') :- Pct >= 40, !.
+class_label(_, '').
+
+% --- Result Status (with class for pass) ---
 result_status(RollNo, Semester, Status) :-
     number_of_backlogs(RollNo, Semester, Count),
     grace_used(RollNo, Semester, Grace),
     ( Count =:= 0 ->
-        Status = 'PASS'
+        overall_percentage(RollNo, Semester, Pct),
+        class_label(Pct, Class),
+        ( Class \= '' ->
+            atom_concat('PASS - ', Class, Status)
+        ;
+            Status = 'PASS'
+        )
     ; Count =:= 1, Grace > 0 ->
-        Status = 'PASS (Grace)'
+        overall_percentage(RollNo, Semester, Pct),
+        class_label(Pct, Class),
+        ( Class \= '' ->
+            atom_concat('PASS (Grace) - ', Class, Status)
+        ;
+            Status = 'PASS (Grace)'
+        )
     ; Count =:= 1 ->
         Status = 'ATKT'
     ;
         Status = 'FAIL'
+    ).
+
+% --- Next Year Eligibility (NEP-2020 Engineering) ---
+% Only for even semesters (end of academic year)
+% Criteria: max 3 backlogs across both semesters, min 34 credits earned across both semesters
+next_year_eligible(RollNo, EvenSemester, Result) :-
+    EvenSemester mod 2 =:= 0,
+    OddSemester is EvenSemester - 1,
+    number_of_backlogs(RollNo, OddSemester, BacklogsOdd),
+    number_of_backlogs(RollNo, EvenSemester, BacklogsEven),
+    TotalBacklogs is BacklogsOdd + BacklogsEven,
+    total_credits(RollNo, OddSemester, CreditsOdd),
+    total_credits(RollNo, EvenSemester, CreditsEven),
+    TotalCredits is CreditsOdd + CreditsEven,
+    ( TotalBacklogs =< 3, TotalCredits >= 34 ->
+        Result = 'ELIGIBLE'
+    ;
+        Result = 'NOT ELIGIBLE'
     ).

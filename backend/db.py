@@ -102,6 +102,66 @@ def insert_marks_batch(roll_no, semester, marks_list, credits_earned):
         conn.close()
 
 
+# UPDATE FUNCTIONS (Edit data)
+
+def update_student(roll_no, name, seat_no, category, year, semester):
+    """Update an existing student record."""
+    q = """
+        UPDATE Student SET name=%s, seat_no=%s, category=%s, year=%s, semester=%s
+        WHERE roll_no=%s
+    """
+    return run_query(q, (name, seat_no, category, year, semester, roll_no))
+
+
+def update_subject(subject_id, subject_name, credits, semester):
+    """Update an existing subject record."""
+    q = """
+        UPDATE Subject SET subject_name=%s, credits=%s, semester=%s
+        WHERE subject_id=%s
+    """
+    return run_query(q, (subject_name, credits, semester, subject_id))
+
+
+def update_component(component_id, component_name, max_marks, passing_marks):
+    """Update an existing component record."""
+    q = """
+        UPDATE Component SET component_name=%s, max_marks=%s, passing_marks=%s
+        WHERE component_id=%s
+    """
+    return run_query(q, (component_name, max_marks, passing_marks, component_id))
+
+
+def update_mark(mark_id, obtained_marks, credits_earned):
+    """Update an existing marks record."""
+    q = """
+        UPDATE Marks SET obtained_marks=%s, credits_earned=%s
+        WHERE mark_id=%s
+    """
+    return run_query(q, (obtained_marks, credits_earned, mark_id))
+
+
+# DELETE FUNCTIONS (Remove data)
+
+def delete_student(roll_no):
+    """Delete a student record (cascades to marks)."""
+    return run_query("DELETE FROM Student WHERE roll_no=%s", (roll_no,))
+
+
+def delete_subject(subject_id):
+    """Delete a subject record (cascades to components and marks)."""
+    return run_query("DELETE FROM Subject WHERE subject_id=%s", (subject_id,))
+
+
+def delete_component(component_id):
+    """Delete a component record (cascades to marks)."""
+    return run_query("DELETE FROM Component WHERE component_id=%s", (component_id,))
+
+
+def delete_mark(mark_id):
+    """Delete a marks record."""
+    return run_query("DELETE FROM Marks WHERE mark_id=%s", (mark_id,))
+
+
 # FETCH FUNCTIONS (Show data)
 
 def get_all_students():
@@ -201,6 +261,43 @@ def calculate_sgpa(roll_no, semester):
     return {"value": sgpa, "execution_time_ms": round(elapsed, 3)}
 
 
+def calculate_cgpa(roll_no, semester):
+    """
+    CGPA = Average of SGPA of current semester and the previous (odd) semester.
+    Only valid for even semesters (2, 4, 6, 8).
+    """
+    start = time.perf_counter()
+
+    if int(semester) % 2 != 0:
+        elapsed = (time.perf_counter() - start) * 1000
+        return {"value": None, "execution_time_ms": round(elapsed, 3), "error": "CGPA is only available for even semesters"}
+
+    odd_sem = int(semester) - 1
+    even_sem = int(semester)
+
+    # Get SGPA for odd semester
+    sgpa_odd = calculate_sgpa(roll_no, odd_sem)
+    # Get SGPA for even semester
+    sgpa_even = calculate_sgpa(roll_no, even_sem)
+
+    if sgpa_odd.get("error") or sgpa_even.get("error"):
+        elapsed = (time.perf_counter() - start) * 1000
+        missing = []
+        if sgpa_odd.get("error"):
+            missing.append("Sem " + str(odd_sem))
+        if sgpa_even.get("error"):
+            missing.append("Sem " + str(even_sem))
+        return {"value": None, "execution_time_ms": round(elapsed, 3),
+                "error": "No data for: " + ", ".join(missing)}
+
+    cgpa = round((sgpa_odd["value"] + sgpa_even["value"]) / 2, 2)
+
+    elapsed = (time.perf_counter() - start) * 1000
+    return {"value": cgpa, "execution_time_ms": round(elapsed, 3),
+            "details": {"sgpa_sem_" + str(odd_sem): sgpa_odd["value"],
+                        "sgpa_sem_" + str(even_sem): sgpa_even["value"]}}
+
+
 def get_total_credits(roll_no, semester):
     """
     Total credits = sum of credits for subjects where student passed ALL components.
@@ -293,13 +390,34 @@ def get_grace_marks(roll_no, semester):
     return {"value": grace, "execution_time_ms": round(elapsed, 3)}
 
 
+def _get_overall_percentage(roll_no, semester):
+    """Helper: Calculate overall percentage for a student in a semester."""
+    q = """
+        SELECT SUM(m.obtained_marks) AS total_obtained,
+               SUM(c.max_marks) AS total_max
+        FROM Marks m
+        JOIN Component c ON m.component_id = c.component_id
+        WHERE m.roll_no = %s AND m.semester = %s
+    """
+    rows = run_query(q, (roll_no, semester), fetch=True)
+    if not rows or not rows[0]["total_max"] or rows[0]["total_max"] == 0:
+        return None
+    return (rows[0]["total_obtained"] / rows[0]["total_max"]) * 100
+
+
 def get_result_status(roll_no, semester):
     """
-    Result status based on backlogs and grace:
-    0 backlogs → PASS
-    1 backlog + grace applicable → PASS (Grace)
+    Result status based on backlogs, grace, and class:
+    0 backlogs → PASS with class (Distinction, First Class, etc.)
+    1 backlog + grace applicable → PASS (Grace) with class
     1 backlog + no grace → ATKT
     2+ backlogs → FAIL
+
+    Class classification (NEP-2020):
+    >= 75% → First Class with Distinction
+    >= 60% → First Class
+    >= 50% → Second Class (Higher Second)
+    >= 40% → Pass Class
     """
     start = time.perf_counter()
 
@@ -307,9 +425,13 @@ def get_result_status(roll_no, semester):
     grace = get_grace_marks(roll_no, semester)["value"]
 
     if backlogs == 0:
-        status = "PASS"
+        pct = _get_overall_percentage(roll_no, semester)
+        class_label = _get_class_label(pct)
+        status = "PASS - " + class_label if class_label else "PASS"
     elif backlogs == 1 and grace > 0:
-        status = "PASS (Grace)"
+        pct = _get_overall_percentage(roll_no, semester)
+        class_label = _get_class_label(pct)
+        status = "PASS (Grace) - " + class_label if class_label else "PASS (Grace)"
     elif backlogs == 1:
         status = "ATKT"
     else:
@@ -317,3 +439,74 @@ def get_result_status(roll_no, semester):
 
     elapsed = (time.perf_counter() - start) * 1000
     return {"value": status, "execution_time_ms": round(elapsed, 3)}
+
+
+def _get_class_label(percentage):
+    """Return class label based on overall percentage (NEP-2020 scheme)."""
+    if percentage is None:
+        return ""
+    if percentage >= 75:
+        return "First Class with Distinction"
+    elif percentage >= 60:
+        return "First Class"
+    elif percentage >= 50:
+        return "Second Class"
+    elif percentage >= 40:
+        return "Pass Class"
+    else:
+        return ""
+
+
+def get_next_year_eligibility(roll_no, semester):
+    """
+    Next year eligibility (NEP-2020 Engineering):
+    Only applicable for even semesters (end of academic year).
+    Criteria:
+    - Maximum 3 backlogs across both semesters of the year
+    - Minimum 34 credits earned across both semesters of the year
+    """
+    start = time.perf_counter()
+
+    if int(semester) % 2 != 0:
+        elapsed = (time.perf_counter() - start) * 1000
+        return {"value": None, "execution_time_ms": round(elapsed, 3),
+                "error": "Next year eligibility is only checked at even semesters (end of year)"}
+
+    odd_sem = int(semester) - 1
+    even_sem = int(semester)
+
+    # Get backlogs for both semesters
+    backlogs_odd = get_backlogs(roll_no, odd_sem)["value"]
+    backlogs_even = get_backlogs(roll_no, even_sem)["value"]
+    total_backlogs = backlogs_odd + backlogs_even
+
+    # Get credits earned for both semesters
+    credits_odd = get_total_credits(roll_no, odd_sem)["value"]
+    credits_even = get_total_credits(roll_no, even_sem)["value"]
+    total_credits = credits_odd + credits_even
+
+    max_backlogs_allowed = 3
+    min_credits_required = 34
+
+    eligible = total_backlogs <= max_backlogs_allowed and total_credits >= min_credits_required
+
+    if eligible:
+        result_val = "ELIGIBLE"
+    else:
+        reasons = []
+        if total_backlogs > max_backlogs_allowed:
+            reasons.append("Backlogs: " + str(total_backlogs) + " (max " + str(max_backlogs_allowed) + ")")
+        if total_credits < min_credits_required:
+            reasons.append("Credits: " + str(total_credits) + " (min " + str(min_credits_required) + ")")
+        result_val = "NOT ELIGIBLE — " + "; ".join(reasons)
+
+    elapsed = (time.perf_counter() - start) * 1000
+    return {"value": result_val, "execution_time_ms": round(elapsed, 3),
+            "details": {
+                "total_backlogs": total_backlogs,
+                "total_credits": total_credits,
+                "backlogs_sem_" + str(odd_sem): backlogs_odd,
+                "backlogs_sem_" + str(even_sem): backlogs_even,
+                "credits_sem_" + str(odd_sem): credits_odd,
+                "credits_sem_" + str(even_sem): credits_even,
+            }}
